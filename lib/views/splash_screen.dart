@@ -28,27 +28,27 @@ class SplashScreen extends StatelessWidget {
               alignment: Alignment.center,
               width: size.width * 0.7,
               height: size.width * 0.7,
-              child: Lottie.asset('assets/push-up-animation.json',
+              child: Lottie.asset('assets/walk.json',
                   fit: BoxFit.cover),
             ),
             SizedBox(
               height: 40,
             ),
             const Text(
-              'Push Up Counter',
+              '제자리 걷기 테스트',
               style: TextStyle(
                   fontSize: 38.0,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.2),
             ),
-            Container(
-              width: size.width * 0.7,
-              child: const Text(
-                'An exciting app partner for your exercise routine',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18.0, letterSpacing: -1.1),
-              ),
-            ),
+            // Container(
+            //   width: size.width * 0.7,
+            //   child: const Text(
+            //     'An exciting app partner for your exercise routine',
+            //     textAlign: TextAlign.center,
+            //     style: TextStyle(fontSize: 18.0, letterSpacing: -1.1),
+            //   ),
+            // ),
             Spacer(),
             ElevatedButton(
               style: raisedButtonStyle,
@@ -58,7 +58,7 @@ class SplashScreen extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => PoseDetectorView()),
                 );
               },
-              child: Text('Start Now!'),
+              child: Text('시작하기!', style: TextStyle(color: Colors.white),),
             ),
             SizedBox(
               height: size.height * 0.03,

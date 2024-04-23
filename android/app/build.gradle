@@ -64,4 +64,6 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    'androidx.lifecycle:lifecycle-runtime-android:2.8.0-alpha04'
+}

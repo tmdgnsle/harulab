@@ -1,3 +1,5 @@
+import 'dart:collection';
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
@@ -55,31 +57,45 @@ class _CameraViewState extends State<CameraView> {
 
   List<List<dynamic>> rows = [];
 
+  double rightKneeXMean = 0;
+  double rightKneeYMean = 0;
+  double rightAnkleXMean = 0;
+  double rightAnkleYMean = 0;
+  double rightHipXMean = 0;
+  double rightHipYMean = 0;
+
+  var kneeX;
+  var kneeY;
+  var ankleX;
+  var ankleY;
+  var hipX;
+  var hipY;
+
   Future<void> requestPermissions() async {
     await [Permission.camera, Permission.storage].request();
   }
 
-
   void saveKneeAngleToCSV(double kneeAngle) async {
-    Directory? directory = await getExternalStorageDirectory();  // Scoped to your app's directory
+    Directory? directory =
+        await getExternalStorageDirectory(); // Scoped to your app's directory
     if (directory == null) {
       print('Cannot find the directory');
       return;
     }
 
-    String filePath = '${directory.path}/kneeAnglesLow.csv';
+    String filePath = '${directory.path}/kneeAnglesSmoothing.csv';
     File file = File(filePath);
     List<dynamic> row = [DateTime.now().toString(), kneeAngle];
     String csvData = const ListToCsvConverter().convert([row]);
 
     try {
-      await file.writeAsString('$csvData\n', mode: FileMode.append, flush: true);
+      await file.writeAsString('$csvData\n',
+          mode: FileMode.append, flush: true);
       print('CSV data saved successfully to $filePath');
     } catch (e) {
       print('Failed to save CSV data: $e');
     }
   }
-
 
   @override
   void initState() {
@@ -89,7 +105,11 @@ class _CameraViewState extends State<CameraView> {
 
   void _initialize() async {
     if (_cameras.isEmpty) {
-      _cameras = await availableCameras();
+      try {
+        _cameras = await availableCameras();
+      } catch (e) {
+        print('Available cameras error: $e');
+      }
     }
     for (var i = 0; i < _cameras.length; i++) {
       if (_cameras[i].lensDirection == widget.initialCameraLensDirection) {
@@ -104,6 +124,7 @@ class _CameraViewState extends State<CameraView> {
 
   @override
   void didUpdateWidget(covariant CameraView oldWidget) {
+    final Size size = MediaQuery.of(context).size;
     if (widget.customPaint != oldWidget.customPaint) {
       if (widget.customPaint == null) return;
       if (_cameraReady == true) {
@@ -120,9 +141,22 @@ class _CameraViewState extends State<CameraView> {
           var ankle = getPoseLandmark(PoseLandmarkType.rightAnkle);
           var hip = getPoseLandmark(PoseLandmarkType.rightHip);
 
+          kneeX = knee.x;
+          kneeY = knee.y;
+          ankleX = ankle.x;
+          ankleY = ankle.y;
+          hipX = hip.x;
+          hipY = hip.y;
+
           // 무릎 각도 검증
           if (knee != null && ankle != null && hip != null) {
-            final kneeAngle = utils.angle(hip, knee, ankle);
+            smoothingPoint(size);
+
+            final Offset offKnee = Offset(rightKneeXMean, rightKneeYMean);
+            final Offset offAnkle = Offset(rightAnkleXMean, rightAnkleYMean);
+            final Offset offHip = Offset(rightHipXMean, rightHipYMean);
+
+            final kneeAngle = utils.angle(offHip, offKnee, offAnkle);
             final marchingState = utils.isMarching(kneeAngle, bloc.state);
             print('Knee Angle: ${kneeAngle.toStringAsFixed(2)}');
             saveKneeAngleToCSV(kneeAngle);
@@ -523,5 +557,61 @@ class _CameraViewState extends State<CameraView> {
         bytesPerRow: plane.bytesPerRow, // used only in iOS
       ),
     );
+  }
+
+  int smoothingFrame = 3; // 예를 들어 평균을 계산하기 위해 사용할 프레임 수
+
+  var rightKneeX = ListQueue<double>();
+  var rightKneeY = ListQueue<double>();
+  var rightAnkleX = ListQueue<double>();
+  var rightAnkleY = ListQueue<double>();
+  var rightHipX = ListQueue<double>();
+  var rightHipY = ListQueue<double>();
+
+  double getMean(ListQueue<double> queue) {
+    if (queue.length < smoothingFrame)
+      return queue.isNotEmpty ? queue.last : 0.0;
+
+    double sum = queue.reduce((value, element) => value + element);
+    queue.removeFirst();
+    return sum / smoothingFrame;
+  }
+
+  void checkOutlier(
+      double point, ListQueue<double> queue, double mean, double maximum) {
+    if (point <= maximum) {
+      if (queue.length < smoothingFrame) {
+        queue.add(point);
+      } else if ((point - queue.elementAt(smoothingFrame - 2)).abs() <= 200) {
+        queue.add(point);
+      } else {
+        double sumOfGaps = 0.0;
+        for (int i = 0; i < smoothingFrame - 2; i++) {
+          double gap = queue.elementAt(i + 1) - queue.elementAt(i);
+          sumOfGaps += gap;
+        }
+        double correctVal = queue.elementAt(smoothingFrame - 1) +
+            sumOfGaps / (smoothingFrame - 1);
+        queue.add(correctVal);
+      }
+    }
+  }
+
+  void smoothingPoint(Size size) {
+    rightKneeXMean = getMean(rightKneeX);
+    rightKneeYMean = getMean(rightKneeY);
+    rightAnkleXMean = getMean(rightAnkleX);
+    rightAnkleYMean = getMean(rightAnkleY);
+    rightHipXMean = getMean(rightHipX);
+    rightHipYMean = getMean(rightHipY);
+
+    log('$rightKneeXMean , $rightKneeYMean , $rightAnkleXMean , $rightAnkleYMean , $rightHipXMean , $rightHipYMean');
+
+    checkOutlier(kneeX, rightKneeX, rightKneeXMean, size.width);
+    checkOutlier(kneeY, rightKneeY, rightKneeYMean, size.height);
+    checkOutlier(ankleX, rightAnkleX, rightAnkleXMean, size.width);
+    checkOutlier(ankleY, rightAnkleY, rightAnkleYMean, size.height);
+    checkOutlier(hipX, rightHipX, rightHipXMean, size.width);
+    checkOutlier(hipY, rightHipY, rightHipYMean, size.height);
   }
 }

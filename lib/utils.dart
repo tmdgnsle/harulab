@@ -25,14 +25,14 @@ Future<String> getLocalPath(String path) async {
 }
 
 double angle(
-  PoseLandmark firstLandmark,
-  PoseLandmark midLandmark,
-  PoseLandmark lastLandmark,
+  Offset firstLandmark,
+  Offset midLandmark,
+  Offset lastLandmark,
 ) {
   final radians = math.atan2(
-          lastLandmark.y - midLandmark.y, lastLandmark.x - midLandmark.x) -
+          lastLandmark.dy - midLandmark.dy, lastLandmark.dx - midLandmark.dx) -
       math.atan2(
-          firstLandmark.y - midLandmark.y, firstLandmark.x - midLandmark.x);
+          firstLandmark.dy - midLandmark.dy, firstLandmark.dx - midLandmark.dx);
   double degrees = radians * 180.0 / math.pi;
   degrees = degrees.abs(); // Angle should never be negative
   if (degrees > 180.0) {
@@ -60,37 +60,5 @@ MarchingState? isMarching(double angleKnee, MarchingState current) {
 }
 
 
-Map<PoseLandmarkType, ListQueue<double>> landmarkQueues = {
-  PoseLandmarkType.rightKnee: ListQueue<double>(smoothingFrame),
-  PoseLandmarkType.rightAnkle: ListQueue<double>(smoothingFrame),
-  PoseLandmarkType.rightHip: ListQueue<double>(smoothingFrame),
-  // 추가 랜드마크에 대해서도 동일하게 적용
-};
-int smoothingFrame = 3;  // 예를 들어 평균을 계산하기 위해 사용할 프레임 수
 
-double getMean(ListQueue<double> queue) {
-  if (queue.length < smoothingFrame) return queue.isNotEmpty ? queue.last : 0.0;
-
-  double sum = queue.reduce((value, element) => value + element);
-  queue.removeFirst();
-  return sum / smoothingFrame;
-}
-
-void checkOutlier(double point, ListQueue<double> queue, double mean, double maximum) {
-  if (point <= maximum) {
-    if (queue.length < smoothingFrame) {
-      queue.add(point);
-    } else if ((point - queue.elementAt(smoothingFrame - 2)).abs() <= 100) {
-      queue.add(point);
-    } else {
-      double sumOfGaps = 0.0;
-      for (int i = 0; i < smoothingFrame - 2; i++) {
-        double gap = queue.elementAt(i + 1) - queue.elementAt(i);
-        sumOfGaps += gap;
-      }
-      double correctVal = queue.elementAt(smoothingFrame - 1) + sumOfGaps / (smoothingFrame - 1);
-      queue.add(correctVal);
-    }
-  }
-}
 
