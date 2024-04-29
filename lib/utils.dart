@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -95,4 +96,62 @@ void checkOutlier(double point, ListQueue<double> queue, double mean, double max
 }
 
 //한 발서기 로직
+/// Measures the length from hip to ankle in a given [pose].
+double measureHipToAnkleLength(PoseLandmark hip,PoseLandmark ankle ) {
+  double distance = (hip.y - ankle.y).abs();
+  return distance;
+}
 
+double measureAnkleToAnkleLength(PoseLandmark ankle1,PoseLandmark ankle2 ) {
+  double distance = (ankle1.y - ankle2.y.abs());
+  return distance;
+}
+
+bool compareLength(double hipToAnkleLength, double ankleToAnkleLength){
+  if(hipToAnkleLength*0.2 < ankleToAnkleLength ){
+    return true;
+  }else{
+    return false;
+  }
+}
+
+
+
+class LengthComparator {
+  int count = 0;
+  bool isTiming = false;
+  late Timer _timer;
+  int secondsPassed = 0;
+
+  void startComparing(double hipToAnkleLength, double ankleToAnkleLength) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
+      bool result = compareLength(hipToAnkleLength, ankleToAnkleLength);
+      if (result) {
+        if (!isTiming) {
+          isTiming = true;
+          startTimer();
+        }
+      } else {
+        if (isTiming) {
+          isTiming = false;
+          stopTimer();
+          secondsPassed = 0; // Resetting the time when compareLength returns false
+        }
+      }
+    });
+  }
+
+  void startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
+      secondsPassed++;
+      if (secondsPassed >= 5) {
+        count++;
+        secondsPassed = 0;
+      }
+    });
+  }
+
+  void stopTimer() {
+    _timer.cancel();
+  }
+}
