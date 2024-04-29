@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_commons/google_mlkit_commons.dart';
 import 'package:harulab/painters/pose_painter.dart';
+import 'package:harulab/views/one_leg/one_leg_camera_view.dart';
 
 import 'camera_view.dart';
 import 'gallery_view.dart';
@@ -9,11 +10,12 @@ import 'gallery_view.dart';
 enum DetectorViewMode { liveFeed, gallery }
 
 class DetectorView extends StatefulWidget {
-  DetectorView({
-    Key? key,
+  const DetectorView({
+    super.key,
     required this.posePainter,
     required this.title,
     required this.onImage,
+    required this.isOneLeg,
     this.customPaint,
     this.text,
     this.initialDetectionMode = DetectorViewMode.liveFeed,
@@ -21,11 +23,13 @@ class DetectorView extends StatefulWidget {
     this.onCameraFeedReady,
     this.onDetectorViewModeChanged,
     this.onCameraLensDirectionChanged,
-  }) : super(key: key);
+
+  });
 
   final PosePainter? posePainter;
   final String title;
   final CustomPaint? customPaint;
+  final bool isOneLeg;
   final String? text;
   final DetectorViewMode initialDetectionMode;
   final Function(InputImage inputImage) onImage;
@@ -49,8 +53,17 @@ class _DetectorViewState extends State<DetectorView> {
 
   @override
   Widget build(BuildContext context) {
-    return _mode == DetectorViewMode.liveFeed
-        ? CameraView(
+    return _mode == DetectorViewMode.liveFeed 
+        ? widget.isOneLeg? 
+        OneLegCameraView(
+            customPaint: widget.customPaint,
+            onImage: widget.onImage,
+            onCameraFeedReady: widget.onCameraFeedReady,
+            onDetectorViewModeChanged: _onDetectorViewModeChanged,
+            initialCameraLensDirection: widget.initialCameraLensDirection,
+            onCameraLensDirectionChanged: widget.onCameraLensDirectionChanged,
+          ):
+        CameraView(
             posePainter: widget.posePainter,
             customPaint: widget.customPaint,
             onImage: widget.onImage,

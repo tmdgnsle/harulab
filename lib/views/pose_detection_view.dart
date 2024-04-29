@@ -7,6 +7,12 @@ import 'package:harulab/painters/pose_painter.dart';
 import 'detector_view.dart';
 
 class PoseDetectorView extends StatefulWidget {
+   const PoseDetectorView({
+    super.key,
+    required this.isOneLeg
+  });
+
+  final bool  isOneLeg  ;
   @override
   State<StatefulWidget> createState() => _PoseDetectorViewState();
 }
@@ -38,6 +44,7 @@ class _PoseDetectorViewState extends State<PoseDetectorView> {
       onImage: _processImage,
       initialCameraLensDirection: _cameraLensDirection,
       onCameraLensDirectionChanged: (value) => _cameraLensDirection = value,
+      isOneLeg: widget.isOneLeg
     );
   }
 

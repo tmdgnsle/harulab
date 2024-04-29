@@ -43,8 +43,8 @@ double angle(
 }
 
 MarchingState? isMarching(double angleKnee, MarchingState current) {
-  final thresholdKneeLift = 90.0; // 무릎이 최대로 구부려졌을 때의 각도 임계값
-  final thresholdKneeLower = 160.0; // 무릎이 펴지기 시작하는 각도의 임계값
+  const thresholdKneeLift = 90.0; // 무릎이 최대로 구부려졌을 때의 각도 임계값
+  const thresholdKneeLower = 160.0; // 무릎이 펴지기 시작하는 각도의 임계값
 
   if (current == MarchingState.neutral && angleKnee < thresholdKneeLift) {
     return MarchingState.legLifted;
@@ -93,4 +93,6 @@ void checkOutlier(double point, ListQueue<double> queue, double mean, double max
     }
   }
 }
+
+//한 발서기 로직
 

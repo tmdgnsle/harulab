@@ -9,7 +9,7 @@ class SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final ButtonStyle raisedButtonStyle = ElevatedButton.styleFrom(
-      backgroundColor: Color(0xFF273338),
+      backgroundColor: const Color(0xFF273338),
       minimumSize: Size(size.width * 0.85, 36),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       shape: const RoundedRectangleBorder(
@@ -17,8 +17,8 @@ class SplashScreen extends StatelessWidget {
       ),
     );
     return Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
-      body: Container(
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: SizedBox(
         width: double.infinity,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
@@ -31,7 +31,7 @@ class SplashScreen extends StatelessWidget {
               child: Lottie.asset('assets/push-up-animation.json',
                   fit: BoxFit.cover),
             ),
-            SizedBox(
+            const SizedBox(
               height: 40,
             ),
             const Text(
@@ -41,7 +41,7 @@ class SplashScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.2),
             ),
-            Container(
+            SizedBox(
               width: size.width * 0.7,
               child: const Text(
                 'An exciting app partner for your exercise routine',
@@ -49,16 +49,26 @@ class SplashScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 18.0, letterSpacing: -1.1),
               ),
             ),
-            Spacer(),
+            const Spacer(),
             ElevatedButton(
               style: raisedButtonStyle,
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => PoseDetectorView()),
+                  MaterialPageRoute(builder: (_) => PoseDetectorView(isOneLeg: true,)),
                 );
               },
-              child: Text('Start Now!'),
+              child: const Text('one leg'),
+            ),
+            ElevatedButton(
+              style: raisedButtonStyle,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => PoseDetectorView(isOneLeg: false,)),
+                );
+              },
+              child: const Text('march'),
             ),
             SizedBox(
               height: size.height * 0.03,
