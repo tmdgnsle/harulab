@@ -64,6 +64,9 @@ class _CameraViewState extends State<CameraView> {
   double rightHipXMean = 0;
   double rightHipYMean = 0;
 
+  var firstAngle = 0.0;
+  var secondAngle = 0.0;
+
   var kneeX;
   var kneeY;
   var ankleX;
@@ -75,7 +78,7 @@ class _CameraViewState extends State<CameraView> {
     await [Permission.camera, Permission.storage].request();
   }
 
-  void saveKneeAngleToCSV(double kneeAngle) async {
+  void saveCSV(double kneeAngle, double? kneeHeight, String fileName) async {
     Directory? directory =
         await getExternalStorageDirectory(); // Scoped to your app's directory
     if (directory == null) {
@@ -83,9 +86,9 @@ class _CameraViewState extends State<CameraView> {
       return;
     }
 
-    String filePath = '${directory.path}/kneeAnglesSmoothing.csv';
+    String filePath = '${directory.path}/$fileName.csv';
     File file = File(filePath);
-    List<dynamic> row = [DateTime.now().toString(), kneeAngle];
+    List<dynamic> row = [DateTime.now().toString(), kneeAngle, kneeHeight];
     String csvData = const ListToCsvConverter().convert([row]);
 
     try {
@@ -157,17 +160,26 @@ class _CameraViewState extends State<CameraView> {
             final Offset offHip = Offset(rightHipXMean, rightHipYMean);
 
             final kneeAngle = utils.angle(offHip, offKnee, offAnkle);
+
             final marchingState = utils.isMarching(kneeAngle, bloc.state);
             print('Knee Angle: ${kneeAngle.toStringAsFixed(2)}');
-            saveKneeAngleToCSV(kneeAngle);
+            saveCSV(kneeAngle, null, 'kneeAngleSmoothing');
+
             if (marchingState != null) {
               if (marchingState == MarchingState.legLifted) {
                 bloc.setMarchingState(marchingState);
+                if (secondAngle < kneeAngle && secondAngle < firstAngle) {
+                  saveCSV(secondAngle, kneeY, 'marchingTime');
+                }
               } else if (marchingState == MarchingState.legLowered) {
                 bloc.increment(); // 제자리 걸음 횟수 증가
                 bloc.setMarchingState(MarchingState.neutral); // 상태 초기화
               }
             }
+            firstAngle = secondAngle;
+            print('First Angle: $firstAngle');
+            secondAngle = kneeAngle;
+            print('Second Angle: $secondAngle');
           }
         }
       }
@@ -227,6 +239,10 @@ class _CameraViewState extends State<CameraView> {
       top: 100,
       child: FloatingActionButton(
         onPressed: () async {
+          final bloc = BlocProvider.of<MarchingCounter>(context);
+          if (_cameraReady == true) {
+            bloc.reset();
+          }
           setState(() {
             _cameraReady = !_cameraReady;
           });
@@ -559,7 +575,7 @@ class _CameraViewState extends State<CameraView> {
     );
   }
 
-  int smoothingFrame = 3; // 예를 들어 평균을 계산하기 위해 사용할 프레임 수
+  int smoothingFrame = 3; // 평균을 계산하기 위해 사용할 프레임 수
 
   var rightKneeX = ListQueue<double>();
   var rightKneeY = ListQueue<double>();
@@ -582,7 +598,7 @@ class _CameraViewState extends State<CameraView> {
     if (point <= maximum) {
       if (queue.length < smoothingFrame) {
         queue.add(point);
-      } else if ((point - queue.elementAt(smoothingFrame - 2)).abs() <= 200) {
+      } else if ((point - queue.elementAt(smoothingFrame - 2)).abs() <= 100) {
         queue.add(point);
       } else {
         double sumOfGaps = 0.0;
