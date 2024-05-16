@@ -28,8 +28,7 @@ class SplashScreen extends StatelessWidget {
               alignment: Alignment.center,
               width: size.width * 0.7,
               height: size.width * 0.7,
-              child: Lottie.asset('assets/walk.json',
-                  fit: BoxFit.cover),
+              child: Lottie.asset('assets/walk.json', fit: BoxFit.cover),
             ),
             SizedBox(
               height: 40,
@@ -55,13 +54,35 @@ class SplashScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => PoseDetectorView()),
+                  MaterialPageRoute(
+                      builder: (_) => PoseDetectorView(
+                            isOneLeg: true,
+                          )),
                 );
               },
-              child: Text('시작하기!', style: TextStyle(color: Colors.white),),
+              child: Text(
+                '제자리 걷기',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
             SizedBox(
               height: size.height * 0.03,
+            ),
+            ElevatedButton(
+              style: raisedButtonStyle,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => PoseDetectorView(
+                            isOneLeg: false,
+                          )),
+                );
+              },
+              child: Text(
+                '한 발 서기',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),

@@ -9,13 +9,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:harulab/models/march_model.dart';
+import 'package:harulab/models/one_leg_model.dart';
 import 'package:harulab/painters/pose_painter.dart';
 import 'package:harulab/utils.dart' as utils;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class CameraView extends StatefulWidget {
-  CameraView(
+class OneLegCameraView extends StatefulWidget {
+  OneLegCameraView(
       {Key? key,
       required this.customPaint,
       required this.onImage,
@@ -35,10 +36,10 @@ class CameraView extends StatefulWidget {
   final CameraLensDirection initialCameraLensDirection;
 
   @override
-  State<CameraView> createState() => _CameraViewState();
+  State<OneLegCameraView> createState() => _OneLegCameraViewState();
 }
 
-class _CameraViewState extends State<CameraView> {
+class _OneLegCameraViewState extends State<OneLegCameraView> {
   static List<CameraDescription> _cameras = [];
   CameraController? _controller;
   int _cameraIndex = -1;
@@ -55,30 +56,46 @@ class _CameraViewState extends State<CameraView> {
   PoseLandmark? p2;
   PoseLandmark? p3;
 
-  List<List<dynamic>> rows = [];
-
   double rightKneeXMean = 0;
   double rightKneeYMean = 0;
+  double rightKneeZMean = 0;
   double rightAnkleXMean = 0;
   double rightAnkleYMean = 0;
+  double rightAnkleZMean = 0;
+  double leftAnkleXMean = 0;
+  double leftAnkleYMean = 0;
+  double leftAnkleZMean = 0;
   double rightHipXMean = 0;
   double rightHipYMean = 0;
+  double rightHipZMean = 0;
+  double leftWristXMean = 0;
+  double leftWristYMean = 0;
+  double leftWristZMean = 0;
 
   var firstAngle = 0.0;
   var secondAngle = 0.0;
 
   var kneeX;
   var kneeY;
-  var ankleX;
-  var ankleY;
+  var kneeZ;
+  var rightankleX;
+  var rightankleY;
+  var rightankleZ;
+  var leftankleX;
+  var leftankleY;
+  var leftankleZ;
   var hipX;
   var hipY;
+  var hipZ;
+  var wristX;
+  var wristY;
+  var wristZ;
 
   Future<void> requestPermissions() async {
     await [Permission.camera, Permission.storage].request();
   }
 
-  void saveCSV(double kneeAngle, double? kneeHeight, String fileName) async {
+  void saveCSV(double row1, double? row2, double? row3, String fileName) async {
     Directory? directory =
         await getExternalStorageDirectory(); // Scoped to your app's directory
     if (directory == null) {
@@ -88,10 +105,84 @@ class _CameraViewState extends State<CameraView> {
 
     String filePath = '${directory.path}/$fileName.csv';
     File file = File(filePath);
-    List<dynamic> row = [DateTime.now().toString(), kneeAngle, kneeHeight];
+    List<dynamic> row = [
+      DateTime.now().toString(),
+      row1,
+      row2 ?? '',
+      row3 ?? ''
+    ];
     String csvData = const ListToCsvConverter().convert([row]);
 
     try {
+      await file.writeAsString('$csvData\n',
+          mode: FileMode.append, flush: true);
+      print('CSV data saved successfully to $filePath');
+    } catch (e) {
+      print('Failed to save CSV data: $e');
+    }
+  }
+
+  void savePointCSV(
+      double ankleX,
+      double ankleY,
+      double ankleZ,
+      double kneeX,
+      double kneeY,
+      double kneeZ,
+      double hipX,
+      double hipY,
+      double hipZ,
+      double object,
+      String fileName) async {
+    Directory? directory =
+        await getExternalStorageDirectory(); // Scoped to your app's directory
+    if (directory == null) {
+      print('Cannot find the directory');
+      return;
+    }
+
+    String filePath = '${directory.path}/$fileName.csv';
+    File file = File(filePath);
+    bool fileExists = await file.exists();
+
+    List<dynamic> headers = [
+      'Timestamp',
+      'Ankle X',
+      'Ankle Y',
+      'Ankle Z',
+      'Knee X',
+      'Knee Y',
+      'Knee Z',
+      'Hip X',
+      'Hip Y',
+      'Hip Z',
+      fileName,
+    ];
+
+    List<dynamic> row = [
+      DateTime.now().toString(),
+      ankleX,
+      ankleY,
+      ankleZ,
+      kneeX,
+      kneeY,
+      kneeZ,
+      hipX,
+      hipY,
+      hipZ,
+      object
+    ];
+
+    String csvData = const ListToCsvConverter().convert([row]);
+
+    try {
+      if (!fileExists) {
+        // Write headers if file does not exist
+        String headerRow = const ListToCsvConverter().convert([headers]);
+        await file.writeAsString('$headerRow\n',
+            mode: FileMode.write, flush: true);
+      }
+
       await file.writeAsString('$csvData\n',
           mode: FileMode.append, flush: true);
       print('CSV data saved successfully to $filePath');
@@ -126,13 +217,13 @@ class _CameraViewState extends State<CameraView> {
   }
 
   @override
-  void didUpdateWidget(covariant CameraView oldWidget) {
+  void didUpdateWidget(covariant OneLegCameraView oldWidget) {
     final Size size = MediaQuery.of(context).size;
     if (widget.customPaint != oldWidget.customPaint) {
       if (widget.customPaint == null) return;
       if (_cameraReady == true) {
         final bloc =
-            BlocProvider.of<MarchingCounter>(context); // 제자리 걸음 운동 카운터 블록
+            BlocProvider.of<OneLegStanding>(context); // 제자리 걸음 운동 카운터 블록
         for (final pose in widget.posePainter!.poses) {
           PoseLandmark getPoseLandmark(PoseLandmarkType type) {
             final PoseLandmark joint = pose.landmarks[type]!;
@@ -141,45 +232,63 @@ class _CameraViewState extends State<CameraView> {
 
           // 오른쪽 다리의 포즈 랜드마크 추출
           var knee = getPoseLandmark(PoseLandmarkType.rightKnee);
-          var ankle = getPoseLandmark(PoseLandmarkType.rightAnkle);
+          var rightankle = getPoseLandmark(PoseLandmarkType.rightAnkle);
+          var leftankle = getPoseLandmark(PoseLandmarkType.leftAnkle);
           var hip = getPoseLandmark(PoseLandmarkType.rightHip);
+          var wrist = getPoseLandmark(PoseLandmarkType.leftWrist);
 
           kneeX = knee.x;
           kneeY = knee.y;
-          ankleX = ankle.x;
-          ankleY = ankle.y;
+          rightankleX = rightankle.x;
+          rightankleY = rightankle.y;
+          leftankleX = leftankle.x;
+          leftankleY = leftankle.y;
           hipX = hip.x;
           hipY = hip.y;
+          wristX = wrist.x;
+          wristY = wrist.y;
+          wristZ = wrist.z;
 
           // 무릎 각도 검증
-          if (knee != null && ankle != null && hip != null) {
+          if (knee != null &&
+              rightankle != null &&
+              leftankle != null &&
+              hip != null &&
+              wrist != null) {
             smoothingPoint(size);
 
             final Offset offKnee = Offset(rightKneeXMean, rightKneeYMean);
-            final Offset offAnkle = Offset(rightAnkleXMean, rightAnkleYMean);
+            final Offset offrightAnkle =
+                Offset(rightAnkleXMean, rightAnkleYMean);
             final Offset offHip = Offset(rightHipXMean, rightHipYMean);
 
-            final kneeAngle = utils.angle(offHip, offKnee, offAnkle);
+            final legLength = utils.measureHipToAnkleLength(hipY, rightankleY);
+            final ankletoAnkle = utils.measureAnkleToAnkleLength(
+                rightAnkleYMean, leftAnkleYMean);
 
-            final marchingState = utils.isMarching(kneeAngle, bloc.state);
-            print('Knee Angle: ${kneeAngle.toStringAsFixed(2)}');
-            saveCSV(kneeAngle, null, 'kneeAngleSmoothing');
+            final oneLegState =
+                utils.isStanding(legLength, ankletoAnkle, bloc.state);
 
-            if (marchingState != null) {
-              if (marchingState == MarchingState.legLifted) {
-                bloc.setMarchingState(marchingState);
-                if (secondAngle < kneeAngle && secondAngle < firstAngle) {
-                  saveCSV(secondAngle, kneeY, 'marchingTime');
-                }
-              } else if (marchingState == MarchingState.legLowered) {
-                bloc.increment(); // 제자리 걸음 횟수 증가
-                bloc.setMarchingState(MarchingState.neutral); // 상태 초기화
+            savePointCSV(
+                rightAnkleXMean,
+                rightAnkleYMean,
+                rightAnkleZMean,
+                rightKneeXMean,
+                rightKneeYMean,
+                rightKneeZMean,
+                rightHipXMean,
+                rightHipYMean,
+                rightHipZMean,
+                ankletoAnkle / legLength,
+                'landmarkPointandPercentage');
+
+            if (oneLegState != null) {
+              if (oneLegState == MarchingState.legLowered) {
+                bloc.low();
+              } else if (oneLegState == MarchingState.legLowered) {
+                bloc.lift();
               }
             }
-            firstAngle = secondAngle;
-            print('First Angle: $firstAngle');
-            secondAngle = kneeAngle;
-            print('Second Angle: $secondAngle');
           }
         }
       }
@@ -579,10 +688,19 @@ class _CameraViewState extends State<CameraView> {
 
   var rightKneeX = ListQueue<double>();
   var rightKneeY = ListQueue<double>();
+  var rightKneeZ = ListQueue<double>();
   var rightAnkleX = ListQueue<double>();
   var rightAnkleY = ListQueue<double>();
+  var rightAnkleZ = ListQueue<double>();
+  var leftAnkleX = ListQueue<double>();
+  var leftAnkleY = ListQueue<double>();
+  var leftAnkleZ = ListQueue<double>();
   var rightHipX = ListQueue<double>();
   var rightHipY = ListQueue<double>();
+  var rightHipZ = ListQueue<double>();
+  var leftWristX = ListQueue<double>();
+  var leftWristY = ListQueue<double>();
+  var leftWristZ = ListQueue<double>();
 
   double getMean(ListQueue<double> queue) {
     if (queue.length < smoothingFrame)
@@ -616,18 +734,36 @@ class _CameraViewState extends State<CameraView> {
   void smoothingPoint(Size size) {
     rightKneeXMean = getMean(rightKneeX);
     rightKneeYMean = getMean(rightKneeY);
+    rightKneeZMean = getMean(rightKneeZ);
     rightAnkleXMean = getMean(rightAnkleX);
     rightAnkleYMean = getMean(rightAnkleY);
+    rightAnkleZMean = getMean(rightAnkleZ);
+    leftAnkleXMean = getMean(leftAnkleX);
+    leftAnkleYMean = getMean(leftAnkleY);
+    leftAnkleZMean = getMean(leftAnkleZ);
     rightHipXMean = getMean(rightHipX);
     rightHipYMean = getMean(rightHipY);
+    rightHipZMean = getMean(rightHipZ);
+    leftWristXMean = getMean(leftWristX);
+    leftWristYMean = getMean(leftWristY);
+    leftWristZMean = getMean(leftWristZ);
 
     log('$rightKneeXMean , $rightKneeYMean , $rightAnkleXMean , $rightAnkleYMean , $rightHipXMean , $rightHipYMean');
 
     checkOutlier(kneeX, rightKneeX, rightKneeXMean, size.width);
     checkOutlier(kneeY, rightKneeY, rightKneeYMean, size.height);
-    checkOutlier(ankleX, rightAnkleX, rightAnkleXMean, size.width);
-    checkOutlier(ankleY, rightAnkleY, rightAnkleYMean, size.height);
+    checkOutlier(kneeZ, rightKneeZ, rightKneeZMean, size.height);
+    checkOutlier(rightankleX, rightAnkleX, rightAnkleXMean, size.width);
+    checkOutlier(rightankleY, rightAnkleY, rightAnkleYMean, size.height);
+    checkOutlier(rightankleZ, rightAnkleZ, rightAnkleZMean, size.height);
+    checkOutlier(leftankleX, leftAnkleX, leftAnkleXMean, size.width);
+    checkOutlier(leftankleY, leftAnkleY, leftAnkleYMean, size.height);
+    checkOutlier(leftankleZ, leftAnkleZ, leftAnkleZMean, size.height);
     checkOutlier(hipX, rightHipX, rightHipXMean, size.width);
     checkOutlier(hipY, rightHipY, rightHipYMean, size.height);
+    checkOutlier(hipZ, rightHipZ, rightHipZMean, size.height);
+    checkOutlier(wristX, leftWristX, leftWristXMean, size.width);
+    checkOutlier(wristY, leftWristY, leftWristYMean, size.height);
+    checkOutlier(wristZ, leftWristZ, leftWristZMean, size.height);
   }
 }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_commons/google_mlkit_commons.dart';
 import 'package:harulab/painters/pose_painter.dart';
 
-import 'camera_view.dart';
+import 'marching_camera_view.dart';
 import 'gallery_view.dart';
 
 enum DetectorViewMode { liveFeed, gallery }
@@ -50,7 +50,7 @@ class _DetectorViewState extends State<DetectorView> {
   @override
   Widget build(BuildContext context) {
     return _mode == DetectorViewMode.liveFeed
-        ? CameraView(
+        ? MarchingCameraView(
             posePainter: widget.posePainter,
             customPaint: widget.customPaint,
             onImage: widget.onImage,
