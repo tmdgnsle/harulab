@@ -65,6 +65,9 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   double leftAnkleXMean = 0;
   double leftAnkleYMean = 0;
   double leftAnkleZMean = 0;
+  double leftHipXMean = 0;
+  double leftHipYMean = 0;
+  double leftHipZMean = 0;
   double rightHipXMean = 0;
   double rightHipYMean = 0;
   double rightHipZMean = 0;
@@ -84,9 +87,12 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   var leftankleX;
   var leftankleY;
   var leftankleZ;
-  var hipX;
-  var hipY;
-  var hipZ;
+  var righthipX;
+  var righthipY;
+  var righthipZ;
+  var lefthipX;
+  var lefthipY;
+  var lefthipZ;
   var wristX;
   var wristY;
   var wristZ;
@@ -234,17 +240,25 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           var knee = getPoseLandmark(PoseLandmarkType.rightKnee);
           var rightankle = getPoseLandmark(PoseLandmarkType.rightAnkle);
           var leftankle = getPoseLandmark(PoseLandmarkType.leftAnkle);
-          var hip = getPoseLandmark(PoseLandmarkType.rightHip);
+          var righthip = getPoseLandmark(PoseLandmarkType.rightHip);
+          var lefthip = getPoseLandmark(PoseLandmarkType.leftHip);
           var wrist = getPoseLandmark(PoseLandmarkType.leftWrist);
 
           kneeX = knee.x;
           kneeY = knee.y;
+          kneeZ = knee.z;
           rightankleX = rightankle.x;
           rightankleY = rightankle.y;
+          rightankleZ = rightankle.z;
           leftankleX = leftankle.x;
           leftankleY = leftankle.y;
-          hipX = hip.x;
-          hipY = hip.y;
+          leftankleZ = leftankle.z;
+          righthipX = righthip.x;
+          righthipY = righthip.y;
+          righthipZ = righthip.z;
+          lefthipX = lefthip.x;
+          lefthipY = lefthip.y;
+          lefthipZ = lefthip.z;
           wristX = wrist.x;
           wristY = wrist.y;
           wristZ = wrist.z;
@@ -253,7 +267,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           if (knee != null &&
               rightankle != null &&
               leftankle != null &&
-              hip != null &&
+              righthip != null &&
               wrist != null) {
             smoothingPoint(size);
 
@@ -262,12 +276,15 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
                 Offset(rightAnkleXMean, rightAnkleYMean);
             final Offset offHip = Offset(rightHipXMean, rightHipYMean);
 
-            final legLength = utils.measureHipToAnkleLength(hipY, rightankleY);
+            final legLength =
+                utils.measureHipToAnkleLength(leftHipYMean, leftAnkleYMean);
             final ankletoAnkle = utils.measureAnkleToAnkleLength(
                 rightAnkleYMean, leftAnkleYMean);
 
             final oneLegState =
                 utils.isStanding(legLength, ankletoAnkle, bloc.state);
+
+            print('oneLegtState: $oneLegState');
 
             savePointCSV(
                 rightAnkleXMean,
@@ -281,12 +298,18 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
                 rightHipZMean,
                 ankletoAnkle / legLength,
                 'landmarkPointandPercentage');
+            log('legLength: $legLength, ankletoAnkle: $ankletoAnkle');
+            log('lefthip: $leftHipYMean, leftankle: $leftAnkleYMean, rightankle: $rightAnkleYMean, righthip: $rightHipYMean');
 
             if (oneLegState != null) {
-              if (oneLegState == MarchingState.legLowered) {
-                bloc.low();
-              } else if (oneLegState == MarchingState.legLowered) {
+              if (oneLegState == OneLegState.legLifted) {
                 bloc.lift();
+                print('oneLegState: $oneLegState');
+                print('blocstate: ${bloc.standing}');
+              } else if (oneLegState == OneLegState.legLowered) {
+                bloc.low();
+                print('oneLegState: $oneLegState');
+                print('blocstate: ${bloc.standing}');
               }
             }
           }
@@ -329,7 +352,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
                     child: widget.customPaint,
                   ),
           ),
-          _counterWidget(),
+          _standingWidget(),
           _backButton(),
           _switchLiveCameraToggle(),
           _detectionViewModeToggle(),
@@ -348,9 +371,9 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
       top: 100,
       child: FloatingActionButton(
         onPressed: () async {
-          final bloc = BlocProvider.of<MarchingCounter>(context);
+          final bloc = BlocProvider.of<OneLegStanding>(context);
           if (_cameraReady == true) {
-            bloc.reset();
+            bloc.low();
           }
           setState(() {
             _cameraReady = !_cameraReady;
@@ -361,8 +384,8 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     );
   }
 
-  Widget _counterWidget() {
-    final bloc = BlocProvider.of<MarchingCounter>(context);
+  Widget _standingWidget() {
+    final bloc = BlocProvider.of<OneLegStanding>(context);
     return Positioned(
       left: 0,
       right: 0,
@@ -372,21 +395,21 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
         child: Column(
           children: [
             const Text(
-              'Counter',
+              'Standing',
               style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 15),
             ),
             Container(
-              width: 70,
+              width: 100,
               decoration: BoxDecoration(
-                  color: Colors.black54,
+                  color: const Color.fromARGB(137, 20, 15, 15),
                   border: Border.all(
                       color: Colors.white.withOpacity(0.4), width: 4.0),
                   borderRadius: const BorderRadius.all(Radius.circular(12))),
               child: Text(
-                '${bloc.counter}',
+                '${bloc.standing}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     color: Colors.white,
@@ -409,7 +432,6 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           child: FloatingActionButton(
             heroTag: Object(),
             onPressed: () {
-              BlocProvider.of<MarchingCounter>(context).reset();
               Navigator.of(context).pop();
             },
             backgroundColor: Colors.black54,
@@ -698,6 +720,9 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   var rightHipX = ListQueue<double>();
   var rightHipY = ListQueue<double>();
   var rightHipZ = ListQueue<double>();
+  var leftHipX = ListQueue<double>();
+  var leftHipY = ListQueue<double>();
+  var leftHipZ = ListQueue<double>();
   var leftWristX = ListQueue<double>();
   var leftWristY = ListQueue<double>();
   var leftWristZ = ListQueue<double>();
@@ -744,6 +769,9 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     rightHipXMean = getMean(rightHipX);
     rightHipYMean = getMean(rightHipY);
     rightHipZMean = getMean(rightHipZ);
+    leftHipXMean = getMean(leftHipX);
+    leftHipYMean = getMean(leftHipY);
+    leftHipZMean = getMean(leftHipZ);
     leftWristXMean = getMean(leftWristX);
     leftWristYMean = getMean(leftWristY);
     leftWristZMean = getMean(leftWristZ);
@@ -759,9 +787,12 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     checkOutlier(leftankleX, leftAnkleX, leftAnkleXMean, size.width);
     checkOutlier(leftankleY, leftAnkleY, leftAnkleYMean, size.height);
     checkOutlier(leftankleZ, leftAnkleZ, leftAnkleZMean, size.height);
-    checkOutlier(hipX, rightHipX, rightHipXMean, size.width);
-    checkOutlier(hipY, rightHipY, rightHipYMean, size.height);
-    checkOutlier(hipZ, rightHipZ, rightHipZMean, size.height);
+    checkOutlier(righthipX, rightHipX, rightHipXMean, size.width);
+    checkOutlier(righthipY, rightHipY, rightHipYMean, size.height);
+    checkOutlier(righthipZ, rightHipZ, rightHipZMean, size.height);
+    checkOutlier(lefthipX, leftHipX, leftHipXMean, size.width);
+    checkOutlier(lefthipY, leftHipY, leftHipYMean, size.height);
+    checkOutlier(lefthipZ, leftHipZ, leftHipZMean, size.height);
     checkOutlier(wristX, leftWristX, leftWristXMean, size.width);
     checkOutlier(wristY, leftWristY, leftWristYMean, size.height);
     checkOutlier(wristZ, leftWristZ, leftWristZMean, size.height);

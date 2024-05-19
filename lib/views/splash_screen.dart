@@ -56,7 +56,7 @@ class SplashScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                       builder: (_) => PoseDetectorView(
-                            isOneLeg: true,
+                            isOneLeg: false,
                           )),
                 );
               },
@@ -65,9 +65,7 @@ class SplashScreen extends StatelessWidget {
                 style: TextStyle(color: Colors.white),
               ),
             ),
-            SizedBox(
-              height: size.height * 0.03,
-            ),
+
             ElevatedButton(
               style: raisedButtonStyle,
               onPressed: () {
@@ -75,7 +73,7 @@ class SplashScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                       builder: (_) => PoseDetectorView(
-                            isOneLeg: false,
+                            isOneLeg: true,
                           )),
                 );
               },

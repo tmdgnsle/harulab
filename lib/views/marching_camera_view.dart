@@ -231,13 +231,18 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
 
           kneeX = knee.x;
           kneeY = knee.y;
+          kneeZ = knee.z;
           ankleX = ankle.x;
           ankleY = ankle.y;
+          ankleZ = ankle.z;
           hipX = hip.x;
           hipY = hip.y;
+          hipZ = hip.z;
           wristX = wrist.x;
           wristY = wrist.y;
           wristZ = wrist.z;
+
+          log('$rightKneeYMean, $rightAnkleYMean, $rightHipYMean');
 
           // 무릎 각도 검증
           if (knee != null && ankle != null && hip != null && wrist != null) {
@@ -250,7 +255,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
 
             final marchingState = utils.isMarching(kneeAngle, bloc.state);
             print('Knee Angle: ${kneeAngle.toStringAsFixed(2)}');
-            saveCSV(kneeAngle, null, null, 'kneeAngleSmoothing');
             saveCSV(
                 leftWristXMean, leftWristYMean, leftWristZMean, 'wristMoving');
             savePointCSV(
@@ -264,7 +268,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
                 rightHipYMean,
                 rightHipZMean,
                 kneeAngle,
-                'landmarkPoint');
+                'kneeAngle');
 
             if (marchingState != null) {
               if (marchingState == MarchingState.legLifted) {

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:harulab/models/march_model.dart';
+import 'package:harulab/models/one_leg_model.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -59,6 +60,23 @@ MarchingState? isMarching(double angleKnee, MarchingState current) {
   return null;
 }
 
+OneLegState? isStanding(
+    double legLength, double ankletoAnkle, OneLegState current) {
+  final double thresholdpercent = 0.25;
+  if (legLength * thresholdpercent < ankletoAnkle) {
+    return OneLegState.legLifted;
+  } else if (legLength * thresholdpercent > ankletoAnkle) {
+    return OneLegState.legLowered;
+  }
+  return null;
+}
 
+double measureHipToAnkleLength(double hipY, double ankleY) {
+  double distance = (hipY - ankleY).abs();
+  return distance;
+}
 
-
+double measureAnkleToAnkleLength(doubleAnkle1Y, doubleAnkle2Y) {
+  double distance = (doubleAnkle1Y - doubleAnkle2Y).abs();
+  return distance;
+}
