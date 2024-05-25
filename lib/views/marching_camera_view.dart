@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:developer';
 import 'dart:io';
@@ -83,6 +84,9 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   var wristX;
   var wristY;
   var wristZ;
+
+  int _remainingSeconds = 60; // 1분 타이머의 초기 값
+  Timer? _timer; // 타이머를 제어할 Timer 객체
 
   Future<void> requestPermissions() async {
     await [Permission.camera, Permission.storage].request();
@@ -184,6 +188,20 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     }
   }
 
+  void _startTimer() {
+    _remainingSeconds = 60; // 타이머 초기화
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_remainingSeconds > 0) {
+          _remainingSeconds--;
+        } else {
+          _timer?.cancel(); // 타이머 취소
+          _cameraReady = false; // _cameraReady를 false로 설정
+        }
+      });
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -246,7 +264,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
 
           // 무릎 각도 검증
           if (knee != null && ankle != null && hip != null && wrist != null) {
-            smoothingPoint(size);
+            smoothingPoint();
             final Offset offKnee = Offset(rightKneeXMean, rightKneeYMean);
             final Offset offAnkle = Offset(rightAnkleXMean, rightAnkleYMean);
             final Offset offHip = Offset(rightHipXMean, rightHipYMean);
@@ -268,7 +286,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
                 rightHipYMean,
                 rightHipZMean,
                 kneeAngle,
-                'kneeAngle');
+                'kneeAngleSide(Y)');
 
             if (marchingState != null) {
               if (marchingState == MarchingState.legLifted) {
@@ -332,6 +350,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           _zoomControl(),
           _exposureControl(),
           _cameraButton(),
+          _remainingTimeWidget(),
         ],
       ),
     );
@@ -347,12 +366,33 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           final bloc = BlocProvider.of<MarchingCounter>(context);
           if (_cameraReady == true) {
             bloc.reset();
+            _timer?.cancel(); // 타이머 취소
+          } else {
+            _startTimer(); // 타이머 시작
           }
           setState(() {
             _cameraReady = !_cameraReady;
           });
         },
         child: Text(_cameraReady ? '촬영 종료' : '촬영 시작'),
+      ),
+    );
+  }
+
+  Widget _remainingTimeWidget() {
+    return Positioned(
+      top: 20,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Text(
+          'Remaining Time: ${Duration(seconds: _remainingSeconds).toString().split('.').first.padLeft(8, '0')}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
@@ -704,27 +744,24 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     return sum / smoothingFrame;
   }
 
-  void checkOutlier(
-      double point, ListQueue<double> queue, double mean, double maximum) {
-    if (point <= maximum) {
-      if (queue.length < smoothingFrame) {
-        queue.add(point);
-      } else if ((point - queue.elementAt(smoothingFrame - 2)).abs() <= 100) {
-        queue.add(point);
-      } else {
-        double sumOfGaps = 0.0;
-        for (int i = 0; i < smoothingFrame - 2; i++) {
-          double gap = queue.elementAt(i + 1) - queue.elementAt(i);
-          sumOfGaps += gap;
-        }
-        double correctVal = queue.elementAt(smoothingFrame - 1) +
-            sumOfGaps / (smoothingFrame - 1);
-        queue.add(correctVal);
+  void checkOutlier(double point, ListQueue<double> queue, double mean) {
+    if (queue.length < smoothingFrame) {
+      queue.add(point);
+    } else if ((point - queue.elementAt(smoothingFrame - 2)).abs() <= 100) {
+      queue.add(point);
+    } else {
+      double sumOfGaps = 0.0;
+      for (int i = 0; i < smoothingFrame - 2; i++) {
+        double gap = queue.elementAt(i + 1) - queue.elementAt(i);
+        sumOfGaps += gap;
       }
+      double correctVal = queue.elementAt(smoothingFrame - 1) +
+          sumOfGaps / (smoothingFrame - 1);
+      queue.add(correctVal);
     }
   }
 
-  void smoothingPoint(Size size) {
+  void smoothingPoint() {
     rightKneeXMean = getMean(rightKneeX);
     rightKneeYMean = getMean(rightKneeY);
     rightKneeZMean = getMean(rightKneeZ);
@@ -740,17 +777,17 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
 
     log('$rightKneeXMean , $rightKneeYMean , $rightAnkleXMean , $rightAnkleYMean , $rightHipXMean , $rightHipYMean');
 
-    checkOutlier(kneeX, rightKneeX, rightKneeXMean, size.width);
-    checkOutlier(kneeY, rightKneeY, rightKneeYMean, size.height);
-    checkOutlier(kneeZ, rightKneeZ, rightKneeZMean, size.height);
-    checkOutlier(ankleX, rightAnkleX, rightAnkleXMean, size.width);
-    checkOutlier(ankleY, rightAnkleY, rightAnkleYMean, size.height);
-    checkOutlier(ankleZ, rightAnkleZ, rightAnkleZMean, size.height);
-    checkOutlier(hipX, rightHipX, rightHipXMean, size.width);
-    checkOutlier(hipY, rightHipY, rightHipYMean, size.height);
-    checkOutlier(hipZ, rightHipZ, rightHipZMean, size.height);
-    checkOutlier(wristX, leftWristX, leftWristXMean, size.width);
-    checkOutlier(wristY, leftWristY, leftWristYMean, size.height);
-    checkOutlier(wristZ, leftWristZ, leftWristZMean, size.height);
+    checkOutlier(kneeX, rightKneeX, rightKneeXMean);
+    checkOutlier(kneeY, rightKneeY, rightKneeYMean);
+    checkOutlier(kneeZ, rightKneeZ, rightKneeZMean);
+    checkOutlier(ankleX, rightAnkleX, rightAnkleXMean);
+    checkOutlier(ankleY, rightAnkleY, rightAnkleYMean);
+    checkOutlier(ankleZ, rightAnkleZ, rightAnkleZMean);
+    checkOutlier(hipX, rightHipX, rightHipXMean);
+    checkOutlier(hipY, rightHipY, rightHipYMean);
+    checkOutlier(hipZ, rightHipZ, rightHipZMean);
+    checkOutlier(wristX, leftWristX, leftWristXMean);
+    checkOutlier(wristY, leftWristY, leftWristYMean);
+    checkOutlier(wristZ, leftWristZ, leftWristZMean);
   }
 }

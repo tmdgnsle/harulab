@@ -5,6 +5,7 @@ enum MarchingState { neutral, legLifted, legLowered }
 class MarchingCounter extends Cubit<MarchingState> {
   MarchingCounter() : super(MarchingState.neutral);
   int counter = 0;
+  int lastcounter = 0;
 
   void setMarchingState(MarchingState current) {
     emit(current);
@@ -16,6 +17,7 @@ class MarchingCounter extends Cubit<MarchingState> {
   }
 
   void reset() {
+    lastcounter = counter;
     counter = 0;
     emit(state);
   }

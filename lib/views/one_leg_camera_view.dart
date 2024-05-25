@@ -263,13 +263,16 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           wristY = wrist.y;
           wristZ = wrist.z;
 
+          log(rightankleY.toString());
+          log(leftankleY.toString());
+
           // 무릎 각도 검증
           if (knee != null &&
               rightankle != null &&
               leftankle != null &&
               righthip != null &&
               wrist != null) {
-            smoothingPoint(size);
+            smoothingPoint();
 
             final Offset offKnee = Offset(rightKneeXMean, rightKneeYMean);
             final Offset offrightAnkle =
@@ -300,6 +303,8 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
                 'landmarkPointandPercentage');
             log('legLength: $legLength, ankletoAnkle: $ankletoAnkle');
             log('lefthip: $leftHipYMean, leftankle: $leftAnkleYMean, rightankle: $rightAnkleYMean, righthip: $rightHipYMean');
+            log(rightankleY.toString());
+            log(leftankleY.toString());
 
             if (oneLegState != null) {
               if (oneLegState == OneLegState.legLifted) {
@@ -712,10 +717,10 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   var rightKneeY = ListQueue<double>();
   var rightKneeZ = ListQueue<double>();
   var rightAnkleX = ListQueue<double>();
-  var rightAnkleY = ListQueue<double>();
+  var rightAnkleYQueue = ListQueue<double>();
   var rightAnkleZ = ListQueue<double>();
   var leftAnkleX = ListQueue<double>();
-  var leftAnkleY = ListQueue<double>();
+  var leftAnkleYQueue = ListQueue<double>();
   var leftAnkleZ = ListQueue<double>();
   var rightHipX = ListQueue<double>();
   var rightHipY = ListQueue<double>();
@@ -728,43 +733,41 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   var leftWristZ = ListQueue<double>();
 
   double getMean(ListQueue<double> queue) {
-    if (queue.length < smoothingFrame)
+    if (queue.length < smoothingFrame) {
       return queue.isNotEmpty ? queue.last : 0.0;
+    }
 
     double sum = queue.reduce((value, element) => value + element);
     queue.removeFirst();
     return sum / smoothingFrame;
   }
 
-  void checkOutlier(
-      double point, ListQueue<double> queue, double mean, double maximum) {
-    if (point <= maximum) {
-      if (queue.length < smoothingFrame) {
-        queue.add(point);
-      } else if ((point - queue.elementAt(smoothingFrame - 2)).abs() <= 100) {
-        queue.add(point);
-      } else {
-        double sumOfGaps = 0.0;
-        for (int i = 0; i < smoothingFrame - 2; i++) {
-          double gap = queue.elementAt(i + 1) - queue.elementAt(i);
-          sumOfGaps += gap;
-        }
-        double correctVal = queue.elementAt(smoothingFrame - 1) +
-            sumOfGaps / (smoothingFrame - 1);
-        queue.add(correctVal);
+  void checkOutlier(double point, ListQueue<double> queue, double mean) {
+    if (queue.length < smoothingFrame) {
+      queue.add(point);
+    } else if ((point - queue.elementAt(smoothingFrame - 2)).abs() <= 300) {
+      queue.add(point);
+    } else {
+      double sumOfGaps = 0.0;
+      for (int i = 0; i < smoothingFrame - 2; i++) {
+        double gap = queue.elementAt(i + 1) - queue.elementAt(i);
+        sumOfGaps += gap;
       }
+      double correctVal = queue.elementAt(smoothingFrame - 1) +
+          sumOfGaps / (smoothingFrame - 1);
+      queue.add(correctVal);
     }
   }
 
-  void smoothingPoint(Size size) {
+  void smoothingPoint() {
     rightKneeXMean = getMean(rightKneeX);
     rightKneeYMean = getMean(rightKneeY);
     rightKneeZMean = getMean(rightKneeZ);
     rightAnkleXMean = getMean(rightAnkleX);
-    rightAnkleYMean = getMean(rightAnkleY);
+    rightAnkleYMean = getMean(rightAnkleYQueue);
     rightAnkleZMean = getMean(rightAnkleZ);
     leftAnkleXMean = getMean(leftAnkleX);
-    leftAnkleYMean = getMean(leftAnkleY);
+    leftAnkleYMean = getMean(leftAnkleYQueue);
     leftAnkleZMean = getMean(leftAnkleZ);
     rightHipXMean = getMean(rightHipX);
     rightHipYMean = getMean(rightHipY);
@@ -777,24 +780,26 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     leftWristZMean = getMean(leftWristZ);
 
     log('$rightKneeXMean , $rightKneeYMean , $rightAnkleXMean , $rightAnkleYMean , $rightHipXMean , $rightHipYMean');
+    log(rightKneeY.map((element) => element).toString());
+    log(rightAnkleYQueue.map((element) => element).toString());
 
-    checkOutlier(kneeX, rightKneeX, rightKneeXMean, size.width);
-    checkOutlier(kneeY, rightKneeY, rightKneeYMean, size.height);
-    checkOutlier(kneeZ, rightKneeZ, rightKneeZMean, size.height);
-    checkOutlier(rightankleX, rightAnkleX, rightAnkleXMean, size.width);
-    checkOutlier(rightankleY, rightAnkleY, rightAnkleYMean, size.height);
-    checkOutlier(rightankleZ, rightAnkleZ, rightAnkleZMean, size.height);
-    checkOutlier(leftankleX, leftAnkleX, leftAnkleXMean, size.width);
-    checkOutlier(leftankleY, leftAnkleY, leftAnkleYMean, size.height);
-    checkOutlier(leftankleZ, leftAnkleZ, leftAnkleZMean, size.height);
-    checkOutlier(righthipX, rightHipX, rightHipXMean, size.width);
-    checkOutlier(righthipY, rightHipY, rightHipYMean, size.height);
-    checkOutlier(righthipZ, rightHipZ, rightHipZMean, size.height);
-    checkOutlier(lefthipX, leftHipX, leftHipXMean, size.width);
-    checkOutlier(lefthipY, leftHipY, leftHipYMean, size.height);
-    checkOutlier(lefthipZ, leftHipZ, leftHipZMean, size.height);
-    checkOutlier(wristX, leftWristX, leftWristXMean, size.width);
-    checkOutlier(wristY, leftWristY, leftWristYMean, size.height);
-    checkOutlier(wristZ, leftWristZ, leftWristZMean, size.height);
+    checkOutlier(kneeX, rightKneeX, rightKneeXMean);
+    checkOutlier(kneeY, rightKneeY, rightKneeYMean);
+    checkOutlier(kneeZ, rightKneeZ, rightKneeZMean);
+    checkOutlier(rightankleX, rightAnkleX, rightAnkleXMean);
+    checkOutlier(rightankleY, rightAnkleYQueue, rightAnkleYMean);
+    checkOutlier(rightankleZ, rightAnkleZ, rightAnkleZMean);
+    checkOutlier(leftankleX, leftAnkleX, leftAnkleXMean);
+    checkOutlier(leftankleY, leftAnkleYQueue, leftAnkleYMean);
+    checkOutlier(leftankleZ, leftAnkleZ, leftAnkleZMean);
+    checkOutlier(righthipX, rightHipX, rightHipXMean);
+    checkOutlier(righthipY, rightHipY, rightHipYMean);
+    checkOutlier(righthipZ, rightHipZ, rightHipZMean);
+    checkOutlier(lefthipX, leftHipX, leftHipXMean);
+    checkOutlier(lefthipY, leftHipY, leftHipYMean);
+    checkOutlier(lefthipZ, leftHipZ, leftHipZMean);
+    checkOutlier(wristX, leftWristX, leftWristXMean);
+    checkOutlier(wristY, leftWristY, leftWristYMean);
+    checkOutlier(wristZ, leftWristZ, leftWristZMean);
   }
 }

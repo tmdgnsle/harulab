@@ -4,6 +4,8 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import 'coordinates_translator.dart';
 
+Size? CanvasSize;
+
 class PosePainter extends CustomPainter {
   PosePainter(
     this.poses,
@@ -18,7 +20,10 @@ class PosePainter extends CustomPainter {
   final CameraLensDirection cameraLensDirection;
 
   @override
+  //TODO 이 SIZE 받아서 smoothing에 넣기
   void paint(Canvas canvas, Size size) {
+    CanvasSize = size;
+
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0
