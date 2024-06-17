@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:developer';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -45,7 +46,7 @@ double angle(
 
 MarchingState? isMarching(double angleKnee, MarchingState current) {
   final thresholdKneeLift = 90.0; // 무릎이 최대로 구부려졌을 때의 각도 임계값
-  final thresholdKneeLower = 160.0; // 무릎이 펴지기 시작하는 각도의 임계값
+  final thresholdKneeLower = 130.0; // 무릎이 펴지기 시작하는 각도의 임계값
 
   if (current == MarchingState.neutral && angleKnee < thresholdKneeLift) {
     return MarchingState.legLifted;
@@ -60,15 +61,14 @@ MarchingState? isMarching(double angleKnee, MarchingState current) {
   return null;
 }
 
-OneLegState? isStanding(
+OneLegState isStanding(
     double legLength, double ankletoAnkle, OneLegState current) {
-  final double thresholdpercent = 0.25;
+  final double thresholdpercent = 0.1;
   if (legLength * thresholdpercent < ankletoAnkle) {
     return OneLegState.legLifted;
-  } else if (legLength * thresholdpercent > ankletoAnkle) {
+  } else {
     return OneLegState.legLowered;
   }
-  return null;
 }
 
 double measureHipToAnkleLength(double hipY, double ankleY) {
@@ -79,4 +79,18 @@ double measureHipToAnkleLength(double hipY, double ankleY) {
 double measureAnkleToAnkleLength(doubleAnkle1Y, doubleAnkle2Y) {
   double distance = (doubleAnkle1Y - doubleAnkle2Y).abs();
   return distance;
+}
+
+double calculateMean(List<double> numbers) {
+  double sum = numbers.reduce((a, b) => a + b);
+  log('평균: ${sum / numbers.length}');
+  return sum / numbers.length;
+}
+
+double calculateDeviation(List<double> numbers) {
+  double mean = calculateMean(numbers);
+  double sumOfSquaredDiffs =
+      numbers.fold(0, (sum, number) => sum + math.pow(number - mean, 2));
+  log('표준편차: ${math.sqrt(sumOfSquaredDiffs / numbers.length)}');
+  return math.sqrt(sumOfSquaredDiffs / numbers.length);
 }
