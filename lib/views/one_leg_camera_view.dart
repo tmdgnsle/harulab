@@ -395,29 +395,44 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           leftelbowX = leftelbow.x;
           leftelbowY = leftelbow.y;
           leftelbowZ = leftelbow.z;
+            
+            
 
+          
           if (rightknee != null &&
               rightankle != null &&
               leftankle != null &&
               righthip != null &&
               rightwrist != null) {
             smoothingPoint();
-
-            final Offset offKnee = Offset(rightKneeXMean, rightKneeYMean);
+          var leftLegDistance = utils.measureHipToAnkleLength(leftHipYMean, leftAnkleYMean);
+          var rightLegDistance = utils.measureHipToAnkleLength(rightHipYMean, rightAnkleYMean);
+          
+          final Offset offKnee = Offset(rightKneeXMean, rightKneeYMean);
             final Offset offrightAnkle =
                 Offset(rightAnkleXMean, rightAnkleYMean);
             final Offset offHip = Offset(rightHipXMean, rightHipYMean);
 
-            final legLength =
+            var legLength =
                 utils.measureHipToAnkleLength(leftHipYMean, leftAnkleYMean);
-            final ankletoAnkle = utils.measureAnkleToAnkleLength(
+            var ankletoAnkle = utils.measureAnkleToAnkleLength(
                 rightAnkleYMean, leftAnkleYMean);
 
-            final oneLegState =
+            var oneLegState =
                 utils.isStanding(legLength, ankletoAnkle, bloc.state);
+          // 왼쪽 다리의 길이가 더길경우 오른쪽 측정 
+          if(leftLegDistance > rightLegDistance){
+            
 
+             legLength =
+                utils.measureHipToAnkleLength(rightHipYMean, rightAnkleYMean);
+             ankletoAnkle = utils.measureAnkleToAnkleLength(
+                leftAnkleYMean, rightAnkleYMean);
+
+             oneLegState =
+                utils.isStanding(legLength, ankletoAnkle, bloc.state);
+          }
             print('oneLegtState: $oneLegState');
-
             savePointCSV(
               [rightAnkleXMean, rightAnkleYMean, rightAnkleZMean],
               [leftAnkleXMean, leftAnkleYMean, leftAnkleZMean],
@@ -430,6 +445,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
               [rightElbowXMean, rightElbowYMean, rightElbowZMean],
               [leftElbowXMean, leftElbowYMean, leftElbowZMean],
             );
+
             log('legLength: $legLength, ankletoAnkle: $ankletoAnkle');
             log('lefthip: $leftHipYMean, leftankle: $leftAnkleYMean, rightankle: $rightAnkleYMean, righthip: $rightHipYMean');
             log(rightankleY.toString());
