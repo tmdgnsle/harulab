@@ -125,6 +125,8 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   int _remainingSeconds = 60; // 1분 타이머의 초기 값
   int _repetitionTimer = 0;
   Timer? _timer; // 타이머를 제어할 Timer 객체
+  int _preparationSeconds = 5; // 5초 준비 시간
+  bool _isPreparing = false; // 준비 중인지 여부를 나타내는 플래그
 
   Future<void> requestPermissions() async {
     await [Permission.camera, Permission.storage].request();
@@ -274,20 +276,31 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
 
   void _startTimer() {
     final bloc = BlocProvider.of<MarchingCounter>(context);
-    _remainingSeconds = 60; // 타이머 초기화
+    _isPreparing = true;
+    _preparationSeconds = 5;
+    _remainingSeconds = 60;
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        if (_remainingSeconds > 0) {
-          _remainingSeconds--;
-          _repetitionTimer = (_remainingSeconds / 10).truncate();
+        if (_isPreparing) {
+          if (_preparationSeconds > 0) {
+            _preparationSeconds--;
+          } else {
+            _isPreparing = false;
+          }
         } else {
-          _timer?.cancel(); // 타이머 취소
-          _cameraReady = false; // _cameraReady를 false로 설정
-          _repetitionTimer = 0;
-          Navigator.of(context).push(MaterialPageRoute(
-              builder: ((context) => ResultMarching(
-                    counter: bloc.counter,
-                  ))));
+          if (_remainingSeconds > 0) {
+            _remainingSeconds--;
+            _repetitionTimer = (_remainingSeconds / 10).truncate();
+          } else {
+            _timer?.cancel();
+            _cameraReady = false;
+            _repetitionTimer = 0;
+            Navigator.of(context).push(MaterialPageRoute(
+                builder: ((context) => ResultMarching(
+                      counter: bloc.counter,
+                    ))));
+          }
         }
       });
     });
@@ -324,7 +337,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     var highestknee = false;
     if (widget.customPaint != oldWidget.customPaint) {
       if (widget.customPaint == null) return;
-      if (_cameraReady == true) {
+      if (_cameraReady == true && !_isPreparing) {
         final bloc =
             BlocProvider.of<MarchingCounter>(context); // 제자리 걸음 운동 카운터 블록
         for (final pose in widget.posePainter!.poses) {
@@ -531,19 +544,21 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
       right: 0,
       top: 100,
       child: FloatingActionButton(
-        onPressed: () async {
-          final bloc = BlocProvider.of<MarchingCounter>(context);
-          if (_cameraReady == true) {
-            bloc.reset();
-            _timer?.cancel(); // 타이머 취소
-            _remainingSeconds = 60;
-          } else {
-            _startTimer(); // 타이머 시작
-          }
-          setState(() {
-            _cameraReady = !_cameraReady;
-          });
-        },
+        onPressed: _isPreparing
+            ? null
+            : () async {
+                final bloc = BlocProvider.of<MarchingCounter>(context);
+                if (_cameraReady == true) {
+                  bloc.reset();
+                  _timer?.cancel();
+                  _remainingSeconds = 60;
+                } else {
+                  _startTimer();
+                }
+                setState(() {
+                  _cameraReady = !_cameraReady;
+                });
+              },
         child: Text(_cameraReady ? '촬영 종료' : '촬영 시작'),
       ),
     );
@@ -556,7 +571,9 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
       right: 0,
       child: Center(
         child: Text(
-          'Remaining Time: ${Duration(seconds: _remainingSeconds).toString().split('.').first.padLeft(8, '0')}',
+          _isPreparing
+              ? '준비시간: $_preparationSeconds'
+              : '남은시간: ${Duration(seconds: _remainingSeconds).toString().split('.').first.padLeft(8, '0')}',
           style: const TextStyle(
             color: Colors.white,
             fontSize: 20,

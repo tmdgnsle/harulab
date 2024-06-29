@@ -125,6 +125,9 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   Timer? _timer2;
   int _standingSeconds = 0;
 
+  int _preparationSeconds = 5; // 5초 준비 시간
+  bool _isPreparing = false; // 준비 중인지 여부를 나타내는 플래그
+
   List<double> standingKnee = [];
 
   Future<void> requestPermissions() async {
@@ -272,18 +275,26 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     _remainingSeconds = 60; // 타이머 초기화
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        if (_remainingSeconds > 0) {
-          _remainingSeconds--;
+        if (_isPreparing) {
+          if (_preparationSeconds > 0) {
+            _preparationSeconds--;
+          } else {
+            _isPreparing = false;
+          }
         } else {
-          _timer!.cancel(); // 타이머 취소
-          _cameraReady = false; // _cameraReady를 false로 설정
-          _remainingSeconds = 60;
-          bloc.setTime(_standingSeconds);
-          _standingSeconds = 0;
-          Navigator.of(context).push(MaterialPageRoute(
-              builder: ((context) => ResultOneLeg(
-                    standingTimer: bloc.standingTimer,
-                  ))));
+          if (_remainingSeconds > 0) {
+            _remainingSeconds--;
+          } else {
+            _timer!.cancel(); // 타이머 취소
+            _cameraReady = false; // _cameraReady를 false로 설정
+            _remainingSeconds = 60;
+            bloc.setTime(_standingSeconds);
+            _standingSeconds = 0;
+            Navigator.of(context).push(MaterialPageRoute(
+                builder: ((context) => ResultOneLeg(
+                      standingTimer: bloc.standingTimer,
+                    ))));
+          }
         }
       });
     });
@@ -331,7 +342,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     final Size size = MediaQuery.of(context).size;
     if (widget.customPaint != oldWidget.customPaint) {
       if (widget.customPaint == null) return;
-      if (_cameraReady == true) {
+      if (_cameraReady == true && !_isPreparing) {
         final bloc =
             BlocProvider.of<OneLegStanding>(context); // 제자리 걸음 운동 카운터 블록
         for (final pose in widget.posePainter!.poses) {
@@ -509,22 +520,24 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
       right: 0,
       top: 100,
       child: FloatingActionButton(
-        onPressed: () async {
-          final bloc = BlocProvider.of<OneLegStanding>(context);
-          if (_cameraReady == true) {
-            bloc.low();
-            _timer!.cancel();
-            _timer2?.cancel();
-            _remainingSeconds = 60;
-            bloc.setTime(_standingSeconds);
-          } else {
-            _startTimer();
-            _standingTimer();
-          }
-          setState(() {
-            _cameraReady = !_cameraReady;
-          });
-        },
+        onPressed: _isPreparing
+            ? null
+            : () async {
+                final bloc = BlocProvider.of<OneLegStanding>(context);
+                if (_cameraReady == true) {
+                  bloc.low();
+                  _timer!.cancel();
+                  _timer2?.cancel();
+                  _remainingSeconds = 60;
+                  bloc.setTime(_standingSeconds);
+                } else {
+                  _startTimer();
+                  _standingTimer();
+                }
+                setState(() {
+                  _cameraReady = !_cameraReady;
+                });
+              },
         child: Text(_cameraReady ? '촬영 종료' : '촬영 시작'),
       ),
     );
@@ -537,7 +550,9 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
       right: 0,
       child: Center(
         child: Text(
-          'Remaining Time: ${Duration(seconds: _remainingSeconds).toString().split('.').first.padLeft(8, '0')}',
+          _isPreparing
+              ? '준비시간: $_preparationSeconds'
+              : '남은시간: ${Duration(seconds: _remainingSeconds).toString().split('.').first.padLeft(8, '0')}',
           style: const TextStyle(
             color: Colors.white,
             fontSize: 20,
