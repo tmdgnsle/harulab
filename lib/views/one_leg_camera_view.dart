@@ -273,6 +273,8 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   void _startTimer() {
     final bloc = BlocProvider.of<OneLegStanding>(context);
     _remainingSeconds = 60; // 타이머 초기화
+    _isPreparing = true;
+    _preparationSeconds = 5;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         if (_isPreparing) {
