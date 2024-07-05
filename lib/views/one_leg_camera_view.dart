@@ -415,21 +415,24 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
               righthip != null &&
               rightwrist != null) {
             smoothingPoint();
-
-            final Offset offKnee = Offset(rightKneeXMean, rightKneeYMean);
-            final Offset offrightAnkle =
-                Offset(rightAnkleXMean, rightAnkleYMean);
-            final Offset offHip = Offset(rightHipXMean, rightHipYMean);
-
-            final legLength =
+           
+            final double legLength;
+            final rightLegLength =
                 utils.measureHipToAnkleLength(leftHipYMean, leftAnkleYMean);
-            final ankletoAnkle = utils.measureAnkleToAnkleLength(
+                final leftLegLength =
+                utils.measureHipToAnkleLength(leftHipYMean, leftAnkleYMean);
+
+              if(rightLegLength > leftLegLength){
+                legLength = rightLegLength;
+              }else{
+                legLength = leftLegLength;
+              }
+           final ankletoAnkle = utils.measureAnkleToAnkleLength(
                 rightAnkleYMean, leftAnkleYMean);
 
             final oneLegState =
                 utils.isStanding(legLength, ankletoAnkle, bloc.state);
 
-            print('oneLegtState: $oneLegState');
 
             savePointCSV(
               [rightAnkleXMean, rightAnkleYMean, rightAnkleZMean],
