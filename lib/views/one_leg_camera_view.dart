@@ -139,7 +139,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
 
   int _preparationSeconds = 5; // 5초 준비 시간
   bool _isPreparing = false; // 준비 중인지 여부를 나타내는 플래그
-
+  int fileIndex = 0;// 파일 저장 할때 파일이름에 붙는 인덱스, 촬영 버튼 누르면 +1
   List<double> standingKnee = [];
 
   Future<void> requestPermissions() async {
@@ -186,6 +186,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     List<double> leftwrist,
     List<double> rightelbow,
     List<double> leftelbow,
+    fileIndex
   ) async {
     Directory? directory =
         await getExternalStorageDirectory(); // Scoped to your app's directory
@@ -193,8 +194,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
       print('Cannot find the directory');
       return;
     }
-
-    String filePath = '${directory.path}/onelegpoint.csv';
+    String filePath = '${directory.path}/onelegpoint$fileIndex.csv';
     File file = File(filePath);
     bool fileExists = await file.exists();
 
@@ -485,6 +485,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
               [leftWristXMean, leftWristYMean, leftWristZMean],
               [rightElbowXMean, rightElbowYMean, rightElbowZMean],
               [leftElbowXMean, leftElbowYMean, leftElbowZMean],
+              fileIndex
             );
             log('legLength: $legLength, ankletoAnkle: $ankletoAnkle');
             log('lefthip: $leftHipYMean, leftankle: $leftAnkleYMean, rightankle: $rightAnkleYMean, righthip: $rightHipYMean');
@@ -581,6 +582,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
                 }
                 setState(() {
                   _cameraReady = !_cameraReady;
+                  fileIndex++;
                 });
               },
         child: Text(_cameraReady ? '촬영 종료' : '촬영 시작'),
