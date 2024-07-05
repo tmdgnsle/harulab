@@ -70,6 +70,12 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   double leftAnkleXMean = 0;
   double leftAnkleYMean = 0;
   double leftAnkleZMean = 0;
+  double rightshoulderXMean = 0;
+  double rightshoulderYMean = 0;
+  double rightshoulderZMean = 0;
+  double leftshoulderXMean = 0;
+  double leftshoulderYMean = 0;
+  double leftshoulderZMean = 0;
   double rightHipXMean = 0;
   double rightHipYMean = 0;
   double rightHipZMean = 0;
@@ -101,6 +107,12 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   var leftankleX;
   var leftankleY;
   var leftankleZ;
+  var rightshoulderX;
+  var rightshoulderY;
+  var rightshoulderZ;
+  var leftshoulderX;
+  var leftshoulderY;
+  var leftshoulderZ;
   var righthipX;
   var righthipY;
   var righthipZ;
@@ -166,6 +178,8 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     List<double> leftankle,
     List<double> rightknee,
     List<double> leftknee,
+    List<double> rightshoulder,
+    List<double> leftshoulder,
     List<double> righthip,
     List<double> lefthip,
     List<double> rightwrist,
@@ -204,6 +218,12 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
       'leftHip X',
       'leftHip Y',
       'leftHip Z',
+      "rightShoulder X",
+      "rightShoulder Y",
+      "rightShoulder Z",
+      "leftShoulder X",
+      "leftShoulder Y",
+      "leftShoulder Z",
       'rightWrist X',
       'rightWrist Y',
       'rightWrist Z',
@@ -216,6 +236,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
       'leftElbow X',
       'leftElbow Y',
       'leftElbow Z',
+      
     ];
 
     List<dynamic> row = [
@@ -238,6 +259,12 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
       lefthip[0],
       lefthip[1],
       lefthip[2],
+      rightshoulder[0],
+      rightshoulder[1],
+      rightshoulder[2],
+      leftshoulder[0],
+      leftshoulder[1],
+      leftshoulder[2],
       rightwrist[0],
       rightwrist[1],
       rightwrist[2],
@@ -360,6 +387,9 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           var rightankle = getPoseLandmark(PoseLandmarkType.rightAnkle);
           var leftankle = getPoseLandmark(PoseLandmarkType.leftAnkle);
 
+          var rightshoulder = getPoseLandmark(PoseLandmarkType.rightShoulder);
+          var leftshoulder = getPoseLandmark(PoseLandmarkType.leftShoulder);
+
           var righthip = getPoseLandmark(PoseLandmarkType.rightHip);
           var lefthip = getPoseLandmark(PoseLandmarkType.leftHip);
 
@@ -384,6 +414,14 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           leftankleX = leftankle.x;
           leftankleY = leftankle.y;
           leftankleZ = leftankle.z;
+          
+          rightshoulderX = rightshoulder.x;
+          rightshoulderY = rightshoulder.y;
+          rightshoulderZ = rightshoulder.z;
+
+          leftshoulderX = leftshoulder.x;
+          leftshoulderY = leftshoulder.y;
+          leftshoulderZ = leftshoulder.z;
 
           righthipX = righthip.x;
           righthipY = righthip.y;
@@ -439,6 +477,8 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
               [leftAnkleXMean, leftAnkleYMean, leftAnkleZMean],
               [rightKneeXMean, rightKneeYMean, rightKneeZMean],
               [leftKneeXMean, leftKneeYMean, leftKneeZMean],
+              [rightElbowXMean, rightElbowYMean, rightElbowZMean],
+              [leftElbowXMean, leftElbowYMean, leftElbowZMean],
               [rightHipXMean, rightHipYMean, rightHipZMean],
               [leftHipXMean, leftHipYMean, leftHipZMean],
               [rightWristXMean, rightWristYMean, rightWristZMean],
