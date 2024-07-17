@@ -502,6 +502,17 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text('제자리 걷기 테스트'),
+        actions: [
+          TextButton(
+              onPressed: () {
+                BlocProvider.of<MarchingCounter>(context).reset();
+                Navigator.of(context).pop();
+              },
+              child: Text('나가기'))
+        ],
+      ),
       body: _liveFeedBody(),
     );
   }
@@ -510,273 +521,142 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     if (_cameras.isEmpty) return Container();
     if (_controller == null) return Container();
     if (_controller?.value.isInitialized == false) return Container();
-    return Container(
-      color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          Center(
-            child: _changingCameraLens
-                ? Center(
-                    child: const Text('Changing camera lens'),
-                  )
-                : CameraPreview(
-                    _controller!,
-                    child: widget.customPaint,
-                  ),
-          ),
-          _counterWidget(),
-          _backButton(),
-          _switchLiveCameraToggle(),
-          _detectionViewModeToggle(),
-          _zoomControl(),
-          _exposureControl(),
-          _cameraButton(),
-          _remainingTimeWidget(),
-        ],
-      ),
-    );
-  }
-
-  Widget _cameraButton() {
-    return Positioned(
-      left: 0,
-      right: 0,
-      top: 100,
-      child: FloatingActionButton(
-        onPressed: _isPreparing
-            ? null
-            : () async {
-                final bloc = BlocProvider.of<MarchingCounter>(context);
-                if (_cameraReady == true) {
-                  bloc.reset();
-                  _timer?.cancel();
-                  _remainingSeconds = 60;
-                } else {
-                  _startTimer();
-                }
-                setState(() {
-                  _cameraReady = !_cameraReady;
-                });
-              },
-        child: Text(_cameraReady ? '촬영 종료' : '촬영 시작'),
-      ),
-    );
-  }
-
-  Widget _remainingTimeWidget() {
-    return Positioned(
-      top: 20,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: Text(
-          _isPreparing
-              ? '준비시간: $_preparationSeconds'
-              : '남은시간: ${Duration(seconds: _remainingSeconds).toString().split('.').first.padLeft(8, '0')}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _counterWidget() {
-    final bloc = BlocProvider.of<MarchingCounter>(context);
-    return Positioned(
-      left: 0,
-      right: 0,
-      top: 50,
-      child: Container(
-        width: 70,
-        child: Column(
-          children: [
-            const Text(
-              'Counter',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15),
-            ),
-            Container(
-              width: 70,
-              decoration: BoxDecoration(
-                  color: Colors.black54,
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.4), width: 4.0),
-                  borderRadius: const BorderRadius.all(Radius.circular(12))),
-              child: Text(
-                '${bloc.counter}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 30.0,
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _backButton() => Positioned(
-        top: 40,
-        left: 8,
-        child: SizedBox(
-          height: 50.0,
-          width: 50.0,
-          child: FloatingActionButton(
-            heroTag: Object(),
-            onPressed: () {
-              BlocProvider.of<MarchingCounter>(context).reset();
-              Navigator.of(context).pop();
-            },
-            backgroundColor: Colors.black54,
-            child: Icon(
-              Icons.arrow_back_ios_outlined,
-              size: 20,
-            ),
-          ),
-        ),
-      );
-
-  Widget _detectionViewModeToggle() => Positioned(
-        bottom: 8,
-        left: 8,
-        child: SizedBox(
-          height: 50.0,
-          width: 50.0,
-          child: FloatingActionButton(
-            heroTag: Object(),
-            onPressed: widget.onDetectorViewModeChanged,
-            backgroundColor: Colors.black54,
-            child: Icon(
-              Icons.photo_library_outlined,
-              size: 25,
-            ),
-          ),
-        ),
-      );
-
-  Widget _switchLiveCameraToggle() => Positioned(
-        bottom: 8,
-        right: 8,
-        child: SizedBox(
-          height: 50.0,
-          width: 50.0,
-          child: FloatingActionButton(
-            heroTag: Object(),
-            onPressed: _switchLiveCamera,
-            backgroundColor: Colors.black54,
-            child: Icon(
-              Platform.isIOS
-                  ? Icons.flip_camera_ios_outlined
-                  : Icons.flip_camera_android_outlined,
-              size: 25,
-            ),
-          ),
-        ),
-      );
-
-  Widget _zoomControl() => Positioned(
-        bottom: 16,
-        left: 0,
-        right: 0,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: SizedBox(
-            width: 250,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Slider(
-                    value: _currentZoomLevel,
-                    min: _minAvailableZoom,
-                    max: _maxAvailableZoom,
-                    activeColor: Colors.white,
-                    inactiveColor: Colors.white30,
-                    onChanged: (value) async {
-                      setState(() {
-                        _currentZoomLevel = value;
-                      });
-                      await _controller?.setZoomLevel(value);
-                    },
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _changingCameraLens
+              ? Center(
+                  child: const Text('Changing camera lens'),
+                )
+              : Center(
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width - 32,
+                    height: MediaQuery.of(context).size.height - 400,
+                    child: CameraPreview(
+                      _controller!,
+                      child: widget.customPaint,
+                    ),
                   ),
                 ),
-                Container(
-                  width: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Center(
-                      child: Text(
-                        '${_currentZoomLevel.toStringAsFixed(1)}x',
-                        style: TextStyle(color: Colors.white),
-                      ),
+          SizedBox(
+            height: 250,
+            child: Column(
+              children: [
+                Icon(Icons.heart_broken),
+                Text('화면에 몸 전체가 나오도록 해주세요'),
+                Text('평소 걸음걸이로 걸어주세요'),
+                // _counterWidget(),
+                _cameraButton(),
+                _remainingTimeWidget(),
+                _switchLiveCameraToggle(),
+                SizedBox(
+                  width: 100,
+                  height: 30,
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    child: Row(
+                      children: [
+                        Text('가이드 영상'),
+                        Icon(Icons.play_circle_filled),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      );
+        ],
+      ),
+    );
+  }
 
-  Widget _exposureControl() => Positioned(
-        top: 40,
-        right: 8,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: 250,
+  Widget _cameraButton() {
+    return ElevatedButton(
+      onPressed: _isPreparing
+          ? null
+          : () async {
+              final bloc = BlocProvider.of<MarchingCounter>(context);
+              if (_cameraReady == true) {
+                bloc.reset();
+                _timer?.cancel();
+                _remainingSeconds = 60;
+              } else {
+                _startTimer();
+              }
+              setState(() {
+                _cameraReady = !_cameraReady;
+              });
+            },
+      child: Text(_cameraReady ? '촬영 종료' : '촬영 시작'),
+    );
+  }
+
+  Widget _remainingTimeWidget() {
+    return Column(
+      children: [
+        Text(
+          _isPreparing ? '준비시간' : '측정중',
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.normal,
           ),
-          child: Column(children: [
-            Container(
-              width: 55,
-              decoration: BoxDecoration(
+        ),
+        Text(
+          _isPreparing ? '$_preparationSeconds초' : '${60 - _remainingSeconds}초',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _counterWidget() {
+    final bloc = BlocProvider.of<MarchingCounter>(context);
+    return SizedBox(
+      width: 70,
+      child: Column(
+        children: [
+          const Text(
+            'Counter',
+            style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          Container(
+            width: 70,
+            decoration: BoxDecoration(
                 color: Colors.black54,
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Center(
-                  child: Text(
-                    '${_currentExposureOffset.toStringAsFixed(1)}x',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.4), width: 4.0),
+                borderRadius: const BorderRadius.all(Radius.circular(12))),
+            child: Text(
+              '${bloc.counter}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 30.0,
+                  fontWeight: FontWeight.bold),
             ),
-            Expanded(
-              child: RotatedBox(
-                quarterTurns: 3,
-                child: SizedBox(
-                  height: 30,
-                  child: Slider(
-                    value: _currentExposureOffset,
-                    min: _minAvailableExposureOffset,
-                    max: _maxAvailableExposureOffset,
-                    activeColor: Colors.white,
-                    inactiveColor: Colors.white30,
-                    onChanged: (value) async {
-                      setState(() {
-                        _currentExposureOffset = value;
-                      });
-                      await _controller?.setExposureOffset(value);
-                    },
-                  ),
-                ),
-              ),
-            )
-          ]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _switchLiveCameraToggle() => SizedBox(
+        height: 50.0,
+        width: 50.0,
+        child: ElevatedButton(
+          onPressed: _switchLiveCamera,
+          child: Icon(
+            Platform.isIOS
+                ? Icons.flip_camera_ios_outlined
+                : Icons.flip_camera_android_outlined,
+            size: 25,
+          ),
         ),
       );
 
