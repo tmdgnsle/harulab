@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:harulab/models/march_model.dart';
+
 
 class ResultMarching extends StatelessWidget {
   final counter;

@@ -40,14 +40,6 @@ class SplashScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.2),
             ),
-            // Container(
-            //   width: size.width * 0.7,
-            //   child: const Text(
-            //     'An exciting app partner for your exercise routine',
-            //     textAlign: TextAlign.center,
-            //     style: TextStyle(fontSize: 18.0, letterSpacing: -1.1),
-            //   ),
-            // ),
             Spacer(),
             ElevatedButton(
               style: raisedButtonStyle,

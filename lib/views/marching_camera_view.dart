@@ -8,13 +8,16 @@ import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:harulab/models/march_model.dart';
+import 'package:harulab/cubit/march_model.dart';
+
 import 'package:harulab/painters/pose_painter.dart';
 import 'package:harulab/utils.dart' as utils;
 import 'package:harulab/views/result_marching.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
 
 class MarchingCameraView extends StatefulWidget {
   MarchingCameraView(
@@ -41,6 +44,7 @@ class MarchingCameraView extends StatefulWidget {
 }
 
 class _MarchingCameraViewState extends State<MarchingCameraView> {
+  FlutterTts flutterTts = FlutterTts();
   static List<CameraDescription> _cameras = [];
   CameraController? _controller;
   int _cameraIndex = -1;
@@ -81,12 +85,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   double leftWristXMean = 0;
   double leftWristYMean = 0;
   double leftWristZMean = 0;
-  double rightElbowXMean = 0;
-  double rightElbowYMean = 0;
-  double rightElbowZMean = 0;
-  double leftElbowXMean = 0;
-  double leftElbowYMean = 0;
-  double leftElbowZMean = 0;
 
   var rightkneeX;
   var rightkneeY;
@@ -112,12 +110,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   var leftwristX;
   var leftwristY;
   var leftwristZ;
-  var rightelbowX;
-  var rightelbowY;
-  var rightelbowZ;
-  var leftelbowX;
-  var leftelbowY;
-  var leftelbowZ;
+
 
   var firstKneeY = 0.0;
   var secondKneeY = 0.0;
@@ -128,35 +121,104 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   int _preparationSeconds = 5; // 5초 준비 시간
   bool _isPreparing = false; // 준비 중인지 여부를 나타내는 플래그
 
+  List<List<dynamic>> csvData = [];
+  bool headerAdded = false;
+
   Future<void> requestPermissions() async {
     await [Permission.camera, Permission.storage].request();
   }
 
-  void saveCSV(double row1, double? row2, double? row3, String fileName) async {
-    Directory? directory =
-        await getExternalStorageDirectory(); // Scoped to your app's directory
-    if (directory == null) {
-      print('Cannot find the directory');
-      return;
+  Future<void> _initTts() async {
+    await flutterTts.setLanguage("ko-KR");  // 또는 원하는 언어로 설정
+    await flutterTts.setSpeechRate(0.5);    // 말하는 속도 조절 (0.0 ~ 1.0)
+    await flutterTts.setVolume(1.0);        // 볼륨 설정 (0.0 ~ 1.0)
+    await flutterTts.setPitch(1.0);         // 음높이 설정 (0.5 ~ 2.0)
+  }
+
+  void addHeaderToCSV() {
+    if (!headerAdded) {
+      csvData.add([
+        'Timestamp',
+        'rightAnkle X', 'rightAnkle Y', 'rightAnkle Z',
+        'leftAnkle X', 'leftAnkle Y', 'leftAnkle Z',
+        'rightKnee X', 'rightKnee Y', 'rightKnee Z',
+        'leftKnee X', 'leftKnee Y', 'leftKnee Z',
+        'rightHip X', 'rightHip Y', 'rightHip Z',
+        'leftHip X', 'leftHip Y', 'leftHip Z',
+        'rightWrist X', 'rightWrist Y', 'rightWrist Z',
+        'leftWrist X', 'leftWrist Y', 'leftWrist Z',
+        'Marching counter',
+        'Knee Angle'
+      ]);
+      headerAdded = true;
+    }
+  }
+
+  void collectCSVData(
+      List<double> rightankle,
+      List<double> leftankle,
+      List<double> rightknee,
+      List<double> leftknee,
+      List<double> righthip,
+      List<double> lefthip,
+      List<double> rightwrist,
+      List<double> leftwrist,
+      double kneeAngle,
+      int count,
+      ) {
+    if (!headerAdded) {
+      addHeaderToCSV();
     }
 
-    String filePath = '${directory.path}/$fileName.csv';
-    File file = File(filePath);
     List<dynamic> row = [
       DateTime.now().toString(),
-      row1,
-      row2 ?? '',
-      row3 ?? ''
+      ...rightankle,
+      ...leftankle,
+      ...rightknee,
+      ...leftknee,
+      ...righthip,
+      ...lefthip,
+      ...rightwrist,
+      ...leftwrist,
+      count,
+      kneeAngle
     ];
-    String csvData = const ListToCsvConverter().convert([row]);
+    csvData.add(row);
+  }
+
+  Future<void> sendCSVDataToServer() async {
+    if (csvData.isEmpty) return;
 
     try {
-      await file.writeAsString('$csvData\n',
-          mode: FileMode.append, flush: true);
-      print('CSV data saved successfully to $filePath');
+      // CSV 데이터를 문자열로 변환 (헤더 포함)
+      final csvString = const ListToCsvConverter().convert(csvData);
+
+      // HTTP 요청 준비
+      var url = Uri.parse('https://your-backend-server.com/upload');
+      var headers = {
+        'Content-Type': 'text/csv',
+        // 필요한 경우 추가 헤더 (예: 인증 토큰)
+      };
+
+      // POST 요청 전송
+      var response = await http.post(
+        url,
+        headers: headers,
+        body: csvString,
+      );
+
+      if (response.statusCode == 200) {
+        print('CSV data sent successfully');
+      } else {
+        print('Failed to send CSV data. Status code: ${response.statusCode}');
+      }
     } catch (e) {
-      print('Failed to save CSV data: $e');
+      print('Error sending CSV data to server: $e');
     }
+
+    // 데이터 전송 후 초기화
+    csvData.clear();
+    headerAdded = false;
   }
 
   void savePointCSV(
@@ -168,8 +230,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     List<double> lefthip,
     List<double> rightwrist,
     List<double> leftwrist,
-    List<double> rightelbow,
-    List<double> leftelbow,
     double kneeAngle,
     int count,
   ) async {
@@ -210,12 +270,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
       'leftWrist X',
       'leftWrist Y',
       'leftWrist Z',
-      'rightElbow X',
-      'rightElbow Y',
-      'rightElbow Z',
-      'leftElbow X',
-      'leftElbow Y',
-      'leftElbow Z',
       'Marching counter',
       'Knee Angle'
     ];
@@ -246,12 +300,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
       leftwrist[0],
       leftwrist[1],
       leftwrist[2],
-      rightelbow[0],
-      rightelbow[1],
-      rightelbow[2],
-      leftelbow[0],
-      leftelbow[1],
-      leftelbow[2],
       count,
       kneeAngle
     ];
@@ -284,9 +332,11 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
       setState(() {
         if (_isPreparing) {
           if (_preparationSeconds > 0) {
+            flutterTts.speak(_preparationSeconds.toString());
             _preparationSeconds--;
           } else {
             _isPreparing = false;
+            flutterTts.speak("시작합니다.");
           }
         } else {
           if (_remainingSeconds > 0) {
@@ -309,6 +359,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   @override
   void initState() {
     super.initState();
+    _initTts();
     requestPermissions().then((_) => _initialize());
   }
 
@@ -333,8 +384,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
 
   @override
   void didUpdateWidget(covariant MarchingCameraView oldWidget) {
-    final Size size = MediaQuery.of(context).size;
-    var highestknee = false;
     if (widget.customPaint != oldWidget.customPaint) {
       if (widget.customPaint == null) return;
       if (_cameraReady == true && !_isPreparing) {
@@ -359,8 +408,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           var rightwrist = getPoseLandmark(PoseLandmarkType.rightWrist);
           var leftwrist = getPoseLandmark(PoseLandmarkType.leftWrist);
 
-          var rightelbow = getPoseLandmark(PoseLandmarkType.rightElbow);
-          var leftelbow = getPoseLandmark(PoseLandmarkType.leftElbow);
 
           rightkneeX = rightknee.x;
           rightkneeY = rightknee.y;
@@ -394,13 +441,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           leftwristY = leftwrist.y;
           leftwristZ = leftwrist.z;
 
-          rightelbowX = rightelbow.x;
-          rightelbowY = rightelbow.y;
-          rightelbowZ = rightelbow.z;
-
-          leftelbowX = leftelbow.x;
-          leftelbowY = leftelbow.y;
-          leftelbowZ = leftelbow.z;
 
           // 무릎 각도 검증
           if (rightknee != null &&
@@ -417,8 +457,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
 
             final marchingState = utils.isMarching(kneeAngle, bloc.state);
             print('Knee Angle: ${kneeAngle.toStringAsFixed(2)}');
-            saveCSV(
-                leftWristXMean, leftWristYMean, leftWristZMean, 'wristMoving');
 
             if (marchingState != null) {
               if (marchingState == MarchingState.legLifted) {
@@ -458,17 +496,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
                 } // 상태 초기화
               }
             }
-            if (bloc.state == MarchingState.legLifted) {
-              log('firstKneeY: $firstKneeY, secondKneeY: $secondKneeY: rightKneeYMean: $rightKneeYMean');
-              if (secondKneeY < rightKneeYMean && secondKneeY < firstKneeY) {
-                log('무릎이 올라갔을 때: $secondKneeY');
-                highestknee = true;
-              } else {
-                highestknee = false;
-              }
-            } else {
-              highestknee = false;
-            }
             savePointCSV(
               [rightAnkleXMean, rightAnkleYMean, rightAnkleZMean],
               [leftAnkleXMean, leftAnkleYMean, leftAnkleZMean],
@@ -478,8 +505,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
               [leftHipXMean, leftHipYMean, leftHipZMean],
               [rightWristXMean, rightWristYMean, rightWristZMean],
               [leftWristXMean, leftWristYMean, leftWristZMean],
-              [rightElbowXMean, rightElbowYMean, rightElbowZMean],
-              [leftElbowXMean, leftElbowYMean, leftElbowZMean],
               kneeAngle,
               bloc.counter,
             );
@@ -525,47 +550,72 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _changingCameraLens
               ? Center(
-                  child: const Text('Changing camera lens'),
+                  child: CircularProgressIndicator(),
                 )
-              : Center(
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width - 32,
-                    height: MediaQuery.of(context).size.height - 400,
-                    child: CameraPreview(
-                      _controller!,
-                      child: widget.customPaint,
-                    ),
+              : Expanded(
+                  child: ClipRect(
+                    child: CameraPreview(_controller!, child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return CustomPaint(
+                          painter: widget.posePainter,
+                          size:
+                              Size(constraints.maxWidth, constraints.maxHeight),
+                        );
+                      },
+                    )),
                   ),
                 ),
-          SizedBox(
-            height: 250,
+          Container(
             child: Column(
               children: [
                 Icon(Icons.heart_broken),
                 Text('화면에 몸 전체가 나오도록 해주세요'),
                 Text('평소 걸음걸이로 걸어주세요'),
-                // _counterWidget(),
-                _cameraButton(),
-                _remainingTimeWidget(),
-                _switchLiveCameraToggle(),
-                SizedBox(
-                  width: 100,
-                  height: 30,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    child: Row(
-                      children: [
-                        Text('가이드 영상'),
-                        Icon(Icons.play_circle_filled),
-                      ],
-                    ),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _remainingTimeWidget(),
+                    _counterWidget(),
+                  ],
                 ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _cameraButton(),
+                    _switchLiveCameraToggle(),
+                  ],
+                ),
+                _guideVideoButton(),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _guideVideoButton() {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        padding: EdgeInsets.symmetric(horizontal: 7, vertical: 0),
+      ),
+      onPressed: () {},
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '가이드 영상',
+            style: TextStyle(fontSize: 12, color: Colors.black),
+          ),
+          Icon(
+            Icons.play_circle_filled,
+            color: Colors.grey,
+            size: 15,
           ),
         ],
       ),
@@ -616,47 +666,28 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
 
   Widget _counterWidget() {
     final bloc = BlocProvider.of<MarchingCounter>(context);
-    return SizedBox(
+    return Container(
       width: 70,
-      child: Column(
-        children: [
-          const Text(
-            'Counter',
-            style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-          ),
-          Container(
-            width: 70,
-            decoration: BoxDecoration(
-                color: Colors.black54,
-                border: Border.all(
-                    color: Colors.white.withOpacity(0.4), width: 4.0),
-                borderRadius: const BorderRadius.all(Radius.circular(12))),
-            child: Text(
-              '${bloc.counter}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 30.0,
-                  fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
+      decoration: BoxDecoration(
+          color: Colors.black54,
+          border: Border.all(color: Colors.white.withOpacity(0.4), width: 4.0),
+          borderRadius: const BorderRadius.all(Radius.circular(12))),
+      child: Text(
+        '${bloc.counter}',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+            color: Colors.white, fontSize: 30.0, fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  Widget _switchLiveCameraToggle() => SizedBox(
-        height: 50.0,
-        width: 50.0,
-        child: ElevatedButton(
-          onPressed: _switchLiveCamera,
-          child: Icon(
-            Platform.isIOS
-                ? Icons.flip_camera_ios_outlined
-                : Icons.flip_camera_android_outlined,
-            size: 25,
-          ),
+  Widget _switchLiveCameraToggle() => ElevatedButton(
+        onPressed: _switchLiveCamera,
+        child: Icon(
+          Platform.isIOS
+              ? Icons.flip_camera_ios_outlined
+              : Icons.flip_camera_android_outlined,
+          size: 25,
         ),
       );
 
@@ -813,12 +844,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   var leftWristX = ListQueue<double>();
   var leftWristY = ListQueue<double>();
   var leftWristZ = ListQueue<double>();
-  var rightElbowX = ListQueue<double>();
-  var rightElbowY = ListQueue<double>();
-  var rightElbowZ = ListQueue<double>();
-  var leftElbowX = ListQueue<double>();
-  var leftElbowY = ListQueue<double>();
-  var leftElbowZ = ListQueue<double>();
 
   double getMean(ListQueue<double> queue) {
     if (queue.length < smoothingFrame)
@@ -879,13 +904,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     leftWristYMean = getMean(leftWristY);
     leftWristZMean = getMean(leftWristZ);
 
-    rightElbowXMean = getMean(rightElbowX);
-    rightElbowYMean = getMean(rightElbowY);
-    rightElbowZMean = getMean(rightElbowZ);
 
-    leftElbowXMean = getMean(leftElbowX);
-    leftElbowYMean = getMean(leftElbowY);
-    leftElbowZMean = getMean(leftElbowZ);
 
     checkOutlier(rightkneeX, rightKneeX, rightKneeXMean);
     checkOutlier(rightkneeY, rightKneeY, rightKneeYMean);
@@ -919,12 +938,5 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     checkOutlier(leftwristY, leftWristY, leftWristYMean);
     checkOutlier(leftwristZ, leftWristZ, leftWristZMean);
 
-    checkOutlier(rightelbowX, rightElbowX, rightElbowXMean);
-    checkOutlier(rightelbowY, rightElbowY, rightElbowYMean);
-    checkOutlier(rightelbowZ, rightElbowZ, rightElbowZMean);
-
-    checkOutlier(leftelbowX, leftElbowX, leftElbowXMean);
-    checkOutlier(leftelbowY, leftElbowY, leftElbowYMean);
-    checkOutlier(leftelbowZ, leftElbowZ, leftElbowZMean);
   }
 }

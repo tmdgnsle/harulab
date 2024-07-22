@@ -9,8 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:harulab/models/march_model.dart';
-import 'package:harulab/models/one_leg_model.dart';
+import 'package:harulab/cubit/one_leg_model.dart';
+
 import 'package:harulab/painters/pose_painter.dart';
 import 'package:harulab/utils.dart' as utils;
 import 'package:harulab/views/result_one_leg.dart';
