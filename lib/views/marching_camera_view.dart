@@ -4,18 +4,17 @@ import 'dart:developer';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:harulab/cubit/march_model.dart';
+import 'package:harulab/cubit/marching_feedback_cubit.dart';
 
 import 'package:harulab/painters/pose_painter.dart';
 import 'package:harulab/utils.dart' as utils;
 import 'package:harulab/views/result_marching.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 
@@ -70,19 +69,11 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   double rightAnkleXMean = 0;
   double rightAnkleYMean = 0;
   double rightAnkleZMean = 0;
-  double leftAnkleXMean = 0;
-  double leftAnkleYMean = 0;
-  double leftAnkleZMean = 0;
   double rightHipXMean = 0;
   double rightHipYMean = 0;
   double rightHipZMean = 0;
-  double leftHipXMean = 0;
-  double leftHipYMean = 0;
-  double leftHipZMean = 0;
-  double rightWristXMean = 0;
   double rightWristYMean = 0;
   double rightWristZMean = 0;
-  double leftWristXMean = 0;
   double leftWristYMean = 0;
   double leftWristZMean = 0;
 
@@ -95,25 +86,13 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   var rightankleX;
   var rightankleY;
   var rightankleZ;
-  var leftankleX;
-  var leftankleY;
-  var leftankleZ;
   var righthipX;
   var righthipY;
   var righthipZ;
-  var lefthipX;
-  var lefthipY;
-  var lefthipZ;
-  var rightwristX;
   var rightwristY;
   var rightwristZ;
-  var leftwristX;
   var leftwristY;
   var leftwristZ;
-
-
-  var firstKneeY = 0.0;
-  var secondKneeY = 0.0;
 
   int _remainingSeconds = 60; // 1분 타이머의 초기 값
   int _repetitionTimer = 0;
@@ -121,209 +100,51 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   int _preparationSeconds = 5; // 5초 준비 시간
   bool _isPreparing = false; // 준비 중인지 여부를 나타내는 플래그
 
-  List<List<dynamic>> csvData = [];
-  bool headerAdded = false;
+  List<Map<String, dynamic>> jsonData = [];
 
   Future<void> requestPermissions() async {
     await [Permission.camera, Permission.storage].request();
   }
 
   Future<void> _initTts() async {
-    await flutterTts.setLanguage("ko-KR");  // 또는 원하는 언어로 설정
-    await flutterTts.setSpeechRate(0.5);    // 말하는 속도 조절 (0.0 ~ 1.0)
-    await flutterTts.setVolume(1.0);        // 볼륨 설정 (0.0 ~ 1.0)
-    await flutterTts.setPitch(1.0);         // 음높이 설정 (0.5 ~ 2.0)
+    await flutterTts.setLanguage("ko-KR"); // 또는 원하는 언어로 설정
+    await flutterTts.setSpeechRate(0.5); // 말하는 속도 조절 (0.0 ~ 1.0)
+    await flutterTts.setVolume(1.0); // 볼륨 설정 (0.0 ~ 1.0)
+    await flutterTts.setPitch(1.0); // 음높이 설정 (0.5 ~ 2.0)
   }
 
-  void addHeaderToCSV() {
-    if (!headerAdded) {
-      csvData.add([
-        'Timestamp',
-        'rightAnkle X', 'rightAnkle Y', 'rightAnkle Z',
-        'leftAnkle X', 'leftAnkle Y', 'leftAnkle Z',
-        'rightKnee X', 'rightKnee Y', 'rightKnee Z',
-        'leftKnee X', 'leftKnee Y', 'leftKnee Z',
-        'rightHip X', 'rightHip Y', 'rightHip Z',
-        'leftHip X', 'leftHip Y', 'leftHip Z',
-        'rightWrist X', 'rightWrist Y', 'rightWrist Z',
-        'leftWrist X', 'leftWrist Y', 'leftWrist Z',
-        'Marching counter',
-        'Knee Angle'
-      ]);
-      headerAdded = true;
-    }
+  void collectJSONData(
+    double leftWristY,
+    double rightWristY,
+    double leftWristZ,
+    double rightWristZ,
+    double leftKneeY,
+    double rightKneeY,
+  ) {
+    Map<String, dynamic> dataPoint = {
+      "Timestamp": DateTime.now().toUtc().toIso8601String(),
+      "leftWrist Y": leftWristY,
+      "rightWrist Y": rightWristY,
+      "leftWrist Z": leftWristZ,
+      "rightWrist Z": rightWristZ,
+      "leftKnee Y": leftKneeY,
+      "rightKnee Y": rightKneeY,
+    };
+    jsonData.add(dataPoint);
   }
 
-  void collectCSVData(
-      List<double> rightankle,
-      List<double> leftankle,
-      List<double> rightknee,
-      List<double> leftknee,
-      List<double> righthip,
-      List<double> lefthip,
-      List<double> rightwrist,
-      List<double> leftwrist,
-      double kneeAngle,
-      int count,
-      ) {
-    if (!headerAdded) {
-      addHeaderToCSV();
-    }
-
-    List<dynamic> row = [
-      DateTime.now().toString(),
-      ...rightankle,
-      ...leftankle,
-      ...rightknee,
-      ...leftknee,
-      ...righthip,
-      ...lefthip,
-      ...rightwrist,
-      ...leftwrist,
-      count,
-      kneeAngle
-    ];
-    csvData.add(row);
-  }
-
-  Future<void> sendCSVDataToServer() async {
-    if (csvData.isEmpty) return;
-
-    try {
-      // CSV 데이터를 문자열로 변환 (헤더 포함)
-      final csvString = const ListToCsvConverter().convert(csvData);
-
-      // HTTP 요청 준비
-      var url = Uri.parse('https://your-backend-server.com/upload');
-      var headers = {
-        'Content-Type': 'text/csv',
-        // 필요한 경우 추가 헤더 (예: 인증 토큰)
-      };
-
-      // POST 요청 전송
-      var response = await http.post(
-        url,
-        headers: headers,
-        body: csvString,
-      );
-
-      if (response.statusCode == 200) {
-        print('CSV data sent successfully');
-      } else {
-        print('Failed to send CSV data. Status code: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error sending CSV data to server: $e');
-    }
-
-    // 데이터 전송 후 초기화
-    csvData.clear();
-    headerAdded = false;
-  }
-
-  void savePointCSV(
-    List<double> rightankle,
-    List<double> leftankle,
-    List<double> rightknee,
-    List<double> leftknee,
-    List<double> righthip,
-    List<double> lefthip,
-    List<double> rightwrist,
-    List<double> leftwrist,
-    double kneeAngle,
-    int count,
-  ) async {
-    Directory? directory =
-        await getExternalStorageDirectory(); // Scoped to your app's directory
-    if (directory == null) {
-      print('Cannot find the directory');
-      return;
-    }
-
-    String filePath = '${directory.path}/marchingpoint.csv';
-    File file = File(filePath);
-    bool fileExists = await file.exists();
-
-    List<dynamic> headers = [
-      'Timestamp',
-      'rightAnkle X',
-      'rightAnkle Y',
-      'rightAnkle Z',
-      'leftAnkle X',
-      'leftAnkle Y',
-      'leftAnkle Z',
-      'rightKnee X',
-      'rightKnee Y',
-      'rightKnee Z',
-      'leftKnee X',
-      'leftKnee Y',
-      'leftKnee Z',
-      'rightHip X',
-      'rightHip Y',
-      'rightHip Z',
-      'leftHip X',
-      'leftHip Y',
-      'leftHip Z',
-      'rightWrist X',
-      'rightWrist Y',
-      'rightWrist Z',
-      'leftWrist X',
-      'leftWrist Y',
-      'leftWrist Z',
-      'Marching counter',
-      'Knee Angle'
-    ];
-
-    List<dynamic> row = [
-      DateTime.now().toString(),
-      rightankle[0],
-      rightankle[1],
-      rightankle[2],
-      leftankle[0],
-      leftankle[1],
-      leftankle[2],
-      rightknee[0],
-      rightknee[1],
-      rightknee[2],
-      leftknee[0],
-      leftknee[1],
-      leftknee[2],
-      righthip[0],
-      righthip[1],
-      righthip[2],
-      lefthip[0],
-      lefthip[1],
-      lefthip[2],
-      rightwrist[0],
-      rightwrist[1],
-      rightwrist[2],
-      leftwrist[0],
-      leftwrist[1],
-      leftwrist[2],
-      count,
-      kneeAngle
-    ];
-
-    String csvData = const ListToCsvConverter().convert([row]);
-
-    try {
-      if (!fileExists) {
-        // Write headers if file does not exist
-        String headerRow = const ListToCsvConverter().convert([headers]);
-        await file.writeAsString('$headerRow\n',
-            mode: FileMode.write, flush: true);
-      }
-
-      await file.writeAsString('$csvData\n',
-          mode: FileMode.append, flush: true);
-      print('CSV data saved successfully to $filePath');
-    } catch (e) {
-      print('Failed to save CSV data: $e');
-    }
+  void sendData() async {
+    context.read<MarchingCounter>().deviation();
+    final bloc = BlocProvider.of<MarchingCounter>(context);
+    await context.read<MarchingFeedbackCubit>().sendMarching(jsonData);
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: ((context) => ResultMarching(
+              counter: bloc.counter,
+              deviation: bloc.standard_deviation,
+            ))));
   }
 
   void _startTimer() {
-    final bloc = BlocProvider.of<MarchingCounter>(context);
     _isPreparing = true;
     _preparationSeconds = 5;
     _remainingSeconds = 60;
@@ -346,13 +167,13 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
             _timer?.cancel();
             _cameraReady = false;
             _repetitionTimer = 0;
-            Navigator.of(context).push(MaterialPageRoute(
-                builder: ((context) => ResultMarching(
-                      counter: bloc.counter,
-                    ))));
           }
         }
       });
+      if (!_isPreparing && _remainingSeconds == 0) {
+        flutterTts.speak('끝났습니다.');
+        sendData();
+      }
     });
   }
 
@@ -400,14 +221,11 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           var leftknee = getPoseLandmark(PoseLandmarkType.leftKnee);
 
           var rightankle = getPoseLandmark(PoseLandmarkType.rightAnkle);
-          var leftankle = getPoseLandmark(PoseLandmarkType.leftAnkle);
 
           var righthip = getPoseLandmark(PoseLandmarkType.rightHip);
-          var lefthip = getPoseLandmark(PoseLandmarkType.leftHip);
 
           var rightwrist = getPoseLandmark(PoseLandmarkType.rightWrist);
           var leftwrist = getPoseLandmark(PoseLandmarkType.leftWrist);
-
 
           rightkneeX = rightknee.x;
           rightkneeY = rightknee.y;
@@ -421,26 +239,15 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           rightankleY = rightankle.y;
           rightankleZ = rightankle.z;
 
-          leftankleX = leftankle.x;
-          leftankleY = leftankle.y;
-          leftankleZ = leftankle.z;
-
           righthipX = righthip.x;
           righthipY = righthip.y;
           righthipZ = righthip.z;
 
-          lefthipX = lefthip.x;
-          lefthipY = lefthip.y;
-          lefthipZ = lefthip.z;
-
-          rightwristX = rightwrist.x;
           rightwristY = rightwrist.y;
           rightwristZ = rightwrist.z;
 
-          leftwristX = leftwrist.x;
           leftwristY = leftwrist.y;
           leftwristZ = leftwrist.z;
-
 
           // 무릎 각도 검증
           if (rightknee != null &&
@@ -496,20 +303,8 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
                 } // 상태 초기화
               }
             }
-            savePointCSV(
-              [rightAnkleXMean, rightAnkleYMean, rightAnkleZMean],
-              [leftAnkleXMean, leftAnkleYMean, leftAnkleZMean],
-              [rightKneeXMean, rightKneeYMean, rightKneeZMean],
-              [leftKneeXMean, leftKneeYMean, leftKneeZMean],
-              [rightHipXMean, rightHipYMean, rightHipZMean],
-              [leftHipXMean, leftHipYMean, leftHipZMean],
-              [rightWristXMean, rightWristYMean, rightWristZMean],
-              [leftWristXMean, leftWristYMean, leftWristZMean],
-              kneeAngle,
-              bloc.counter,
-            );
-            firstKneeY = secondKneeY;
-            secondKneeY = rightKneeYMean;
+            collectJSONData(leftWristYMean, rightWristYMean, leftWristZMean,
+                rightWristZMean, leftKneeYMean, rightKneeYMean);
           }
         }
       }
@@ -561,7 +356,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
                     child: CameraPreview(_controller!, child: LayoutBuilder(
                       builder: (context, constraints) {
                         return CustomPaint(
-                          painter: widget.posePainter,
                           size:
                               Size(constraints.maxWidth, constraints.maxHeight),
                         );
@@ -829,19 +623,11 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   var rightAnkleX = ListQueue<double>();
   var rightAnkleY = ListQueue<double>();
   var rightAnkleZ = ListQueue<double>();
-  var leftAnkleX = ListQueue<double>();
-  var leftAnkleY = ListQueue<double>();
-  var leftAnkleZ = ListQueue<double>();
   var rightHipX = ListQueue<double>();
   var rightHipY = ListQueue<double>();
   var rightHipZ = ListQueue<double>();
-  var leftHipX = ListQueue<double>();
-  var leftHipY = ListQueue<double>();
-  var leftHipZ = ListQueue<double>();
-  var rightWristX = ListQueue<double>();
   var rightWristY = ListQueue<double>();
   var rightWristZ = ListQueue<double>();
-  var leftWristX = ListQueue<double>();
   var leftWristY = ListQueue<double>();
   var leftWristZ = ListQueue<double>();
 
@@ -884,27 +670,15 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     rightAnkleYMean = getMean(rightAnkleY);
     rightAnkleZMean = getMean(rightAnkleZ);
 
-    leftAnkleXMean = getMean(leftAnkleX);
-    leftAnkleYMean = getMean(leftAnkleY);
-    leftAnkleZMean = getMean(leftAnkleZ);
-
     rightHipXMean = getMean(rightHipX);
     rightHipYMean = getMean(rightHipY);
     rightHipZMean = getMean(rightHipZ);
 
-    leftHipXMean = getMean(leftHipX);
-    leftHipYMean = getMean(leftHipY);
-    leftHipZMean = getMean(leftHipZ);
-
-    rightWristXMean = getMean(rightWristX);
     rightWristYMean = getMean(rightWristY);
     rightWristZMean = getMean(rightWristZ);
 
-    leftWristXMean = getMean(leftWristX);
     leftWristYMean = getMean(leftWristY);
     leftWristZMean = getMean(leftWristZ);
-
-
 
     checkOutlier(rightkneeX, rightKneeX, rightKneeXMean);
     checkOutlier(rightkneeY, rightKneeY, rightKneeYMean);
@@ -918,25 +692,14 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     checkOutlier(rightankleY, rightAnkleY, rightAnkleYMean);
     checkOutlier(rightankleZ, rightAnkleZ, rightAnkleZMean);
 
-    checkOutlier(leftankleX, leftAnkleX, leftAnkleXMean);
-    checkOutlier(leftankleY, leftAnkleY, leftAnkleYMean);
-    checkOutlier(leftankleZ, leftAnkleZ, leftAnkleZMean);
-
     checkOutlier(righthipX, rightHipX, rightHipXMean);
     checkOutlier(righthipY, rightHipY, rightHipYMean);
     checkOutlier(righthipZ, rightHipZ, rightHipZMean);
 
-    checkOutlier(lefthipX, leftHipX, leftHipXMean);
-    checkOutlier(lefthipY, leftHipY, leftHipYMean);
-    checkOutlier(lefthipZ, leftHipZ, leftHipZMean);
-
-    checkOutlier(rightwristX, rightWristX, rightWristXMean);
     checkOutlier(rightwristY, rightWristY, rightWristYMean);
     checkOutlier(rightwristZ, rightWristZ, rightWristZMean);
 
-    checkOutlier(leftwristX, leftWristX, leftWristXMean);
     checkOutlier(leftwristY, leftWristY, leftWristYMean);
     checkOutlier(leftwristZ, leftWristZ, leftWristZMean);
-
   }
 }
