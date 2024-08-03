@@ -140,7 +140,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     Navigator.of(context).push(MaterialPageRoute(
         builder: ((context) => ResultMarching(
               counter: bloc.counter,
-              deviation: bloc.standard_deviation,
+              standad_deviation: bloc.standard_deviation,
             ))));
   }
 
@@ -263,7 +263,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
             final kneeAngle = utils.angle(offHip, offKnee, offAnkle);
 
             final marchingState = utils.isMarching(kneeAngle, bloc.state);
-            print('Knee Angle: ${kneeAngle.toStringAsFixed(2)}');
 
             if (marchingState != null) {
               if (marchingState == MarchingState.legLifted) {

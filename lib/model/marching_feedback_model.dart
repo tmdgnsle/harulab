@@ -25,6 +25,16 @@ class MarchingFeedbackModel extends Equatable {
             right_swing: 0,
             swing_height: 0);
 
+  factory MarchingFeedbackModel.fromJson(Map<String, dynamic> json) {
+    return MarchingFeedbackModel(
+        swing_height: json['swing_height'],
+        deviation: json['deviation'],
+        knee_height: json['knee_height'],
+        left_swing: json['left_swing'],
+        right_swing: json['right_swing'],
+        mean_amplitude: json['mean_amplitude']);
+  }
+
   @override
   List<Object?> get props => [
         swing_height,

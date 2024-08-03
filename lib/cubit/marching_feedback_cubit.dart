@@ -10,7 +10,7 @@ class MarchingFeedbackCubit extends Cubit<MarchingFeedbackCubitState> {
 
   MarchingFeedbackCubit() : super(InitMarchingFeedbackCubitState());
 
-  Future<void> sendMarching(Map<String, dynamic> json) async {
+  Future<void> sendMarching(List<Map<String, dynamic>> json) async {
     try {
       if (state is LoadingMarchingFeedbackCubitState) return;
       emit(LoadingMarchingFeedbackCubitState(

@@ -1,20 +1,19 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:developer';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:harulab/cubit/one_leg_feedback_cubit.dart';
 import 'package:harulab/cubit/one_leg_model.dart';
 
 import 'package:harulab/painters/pose_painter.dart';
 import 'package:harulab/utils.dart' as utils;
 import 'package:harulab/views/result_one_leg.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class OneLegCameraView extends StatefulWidget {
@@ -42,6 +41,7 @@ class OneLegCameraView extends StatefulWidget {
 }
 
 class _OneLegCameraViewState extends State<OneLegCameraView> {
+  FlutterTts flutterTts = FlutterTts();
   static List<CameraDescription> _cameras = [];
   CameraController? _controller;
   int _cameraIndex = -1;
@@ -58,67 +58,43 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   PoseLandmark? p2;
   PoseLandmark? p3;
 
-  double rightKneeXMean = 0;
   double rightKneeYMean = 0;
-  double rightKneeZMean = 0;
-  double leftKneeXMean = 0;
   double leftKneeYMean = 0;
-  double leftKneeZMean = 0;
-  double rightAnkleXMean = 0;
   double rightAnkleYMean = 0;
-  double rightAnkleZMean = 0;
-  double leftAnkleXMean = 0;
   double leftAnkleYMean = 0;
-  double leftAnkleZMean = 0;
-  double rightHipXMean = 0;
   double rightHipYMean = 0;
-  double rightHipZMean = 0;
-  double leftHipXMean = 0;
   double leftHipYMean = 0;
-  double leftHipZMean = 0;
   double rightWristXMean = 0;
   double rightWristYMean = 0;
-  double rightWristZMean = 0;
   double leftWristXMean = 0;
   double leftWristYMean = 0;
-  double leftWristZMean = 0;
   double rightElbowXMean = 0;
   double rightElbowYMean = 0;
-  double rightElbowZMean = 0;
   double leftElbowXMean = 0;
   double leftElbowYMean = 0;
-  double leftElbowZMean = 0;
+  double rightShoulderXMean = 0;
+  double rightShoulderYMean = 0;
+  double leftShoulderXMean = 0;
+  double leftShoulderYMean = 0;
 
-  var rightkneeX;
   var rightkneeY;
-  var rightkneeZ;
-  var leftkneeX;
   var leftkneeY;
-  var leftkneeZ;
-  var rightankleX;
   var rightankleY;
-  var rightankleZ;
-  var leftankleX;
   var leftankleY;
-  var leftankleZ;
-  var righthipX;
   var righthipY;
-  var righthipZ;
-  var lefthipX;
   var lefthipY;
-  var lefthipZ;
   var rightwristX;
   var rightwristY;
-  var rightwristZ;
   var leftwristX;
   var leftwristY;
-  var leftwristZ;
   var rightelbowX;
   var rightelbowY;
-  var rightelbowZ;
   var leftelbowX;
   var leftelbowY;
-  var leftelbowZ;
+  var rightshoulderX;
+  var rightshoulderY;
+  var leftshoulderX;
+  var leftshoulderY;
 
   int _remainingSeconds = 60; // 1분 타이머의 초기 값
   Timer? _timer; // 타이머를 제어할 Timer 객체
@@ -128,146 +104,70 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   int _preparationSeconds = 5; // 5초 준비 시간
   bool _isPreparing = false; // 준비 중인지 여부를 나타내는 플래그
 
-  List<double> standingKnee = [];
+  List<Map<String, dynamic>> jsonData = [];
 
   Future<void> requestPermissions() async {
     await [Permission.camera, Permission.storage].request();
   }
 
-  void saveCSV(double row1, double? row2, double? row3, String fileName) async {
-    Directory? directory =
-        await getExternalStorageDirectory(); // Scoped to your app's directory
-    if (directory == null) {
-      print('Cannot find the directory');
-      return;
-    }
-
-    String filePath = '${directory.path}/$fileName.csv';
-    File file = File(filePath);
-    List<dynamic> row = [
-      DateTime.now().toString(),
-      row1,
-      row2 ?? '',
-      row3 ?? ''
-    ];
-    String csvData = const ListToCsvConverter().convert([row]);
-
-    try {
-      await file.writeAsString('$csvData\n',
-          mode: FileMode.append, flush: true);
-      print('CSV data saved successfully to $filePath');
-    } catch (e) {
-      print('Failed to save CSV data: $e');
-    }
+  Future<void> _initTts() async {
+    await flutterTts.setLanguage("ko-KR"); // 또는 원하는 언어로 설정
+    await flutterTts.setSpeechRate(0.5); // 말하는 속도 조절 (0.0 ~ 1.0)
+    await flutterTts.setVolume(1.0); // 볼륨 설정 (0.0 ~ 1.0)
+    await flutterTts.setPitch(1.0); // 음높이 설정 (0.5 ~ 2.0)
   }
 
-  void savePointCSV(
-    List<double> rightankle,
-    List<double> leftankle,
-    List<double> rightknee,
-    List<double> leftknee,
-    List<double> righthip,
-    List<double> lefthip,
-    List<double> rightwrist,
-    List<double> leftwrist,
-    List<double> rightelbow,
-    List<double> leftelbow,
-  ) async {
-    Directory? directory =
-        await getExternalStorageDirectory(); // Scoped to your app's directory
-    if (directory == null) {
-      print('Cannot find the directory');
-      return;
-    }
+  void collectJSONData(
+    double rightAnkleY,
+    double leftAnkleY,
+    double rightHipY,
+    double leftHipY,
+    double rightKneeY,
+    double leftKneeY,
+    double rightShoulderX,
+    double rightShoulderY,
+    double leftShoulderX,
+    double leftShoulderY,
+    double rightWristX,
+    double rightWristY,
+    double leftWristX,
+    double leftWristY,
+    double rightElbowX,
+    double rightElbowY,
+    double leftElbowX,
+    double leftElbowY,
+  ) {
+    Map<String, dynamic> dataPoint = {
+      "Timestamp": DateTime.now().toUtc().toIso8601String(),
+      "rightAnkle Y": rightAnkleY,
+      "leftAnkle Y": leftAnkleY,
+      "rightHip Y": rightHipY,
+      "leftHip Y": leftHipY,
+      "rightKnee Y": rightKneeY,
+      "leftKnee Y": leftKneeY,
+      "rightShoulder X": rightShoulderX,
+      "rightShoulder Y": rightShoulderY,
+      "leftShoulder X": leftShoulderX,
+      "leftShoulder Y": leftShoulderY,
+      "rightWrist X": rightWristX,
+      "rightWrist Y": rightWristY,
+      "leftWrist X": leftWristX,
+      "leftWrist Y": leftWristY,
+      "rightElbow X": rightElbowX,
+      "rightElbow Y": rightElbowY,
+      "leftElbow X": leftElbowX,
+      "leftElbow Y": leftElbowY,
+    };
+    jsonData.add(dataPoint);
+  }
 
-    String filePath = '${directory.path}/onelegpoint.csv';
-    File file = File(filePath);
-    bool fileExists = await file.exists();
-
-    List<dynamic> headers = [
-      'Timestamp',
-      'rightAnkle X',
-      'rightAnkle Y',
-      'rightAnkle Z',
-      'leftAnkle X',
-      'leftAnkle Y',
-      'leftAnkle Z',
-      'rightKnee X',
-      'rightKnee Y',
-      'rightKnee Z',
-      'leftKnee X',
-      'leftKnee Y',
-      'leftKnee Z',
-      'rightHip X',
-      'rightHip Y',
-      'rightHip Z',
-      'leftHip X',
-      'leftHip Y',
-      'leftHip Z',
-      'rightWrist X',
-      'rightWrist Y',
-      'rightWrist Z',
-      'leftWrist X',
-      'leftWrist Y',
-      'leftWrist Z',
-      'rightElbow X',
-      'rightElbow Y',
-      'rightElbow Z',
-      'leftElbow X',
-      'leftElbow Y',
-      'leftElbow Z',
-    ];
-
-    List<dynamic> row = [
-      DateTime.now().toString(),
-      rightankle[0],
-      rightankle[1],
-      rightankle[2],
-      leftankle[0],
-      leftankle[1],
-      leftankle[2],
-      rightknee[0],
-      rightknee[1],
-      rightknee[2],
-      leftknee[0],
-      leftknee[1],
-      leftknee[2],
-      righthip[0],
-      righthip[1],
-      righthip[2],
-      lefthip[0],
-      lefthip[1],
-      lefthip[2],
-      rightwrist[0],
-      rightwrist[1],
-      rightwrist[2],
-      leftwrist[0],
-      leftwrist[1],
-      leftwrist[2],
-      rightelbow[0],
-      rightelbow[1],
-      rightelbow[2],
-      leftelbow[0],
-      leftelbow[1],
-      leftelbow[2],
-    ];
-
-    String csvData = const ListToCsvConverter().convert([row]);
-
-    try {
-      if (!fileExists) {
-        // Write headers if file does not exist
-        String headerRow = const ListToCsvConverter().convert([headers]);
-        await file.writeAsString('$headerRow\n',
-            mode: FileMode.write, flush: true);
-      }
-
-      await file.writeAsString('$csvData\n',
-          mode: FileMode.append, flush: true);
-      print('CSV data saved successfully to $filePath');
-    } catch (e) {
-      print('Failed to save CSV data: $e');
-    }
+  void sendData() async {
+    final bloc = BlocProvider.of<OneLegStanding>(context);
+    await context.read<OneLegFeedbackCubit>().sendMarching(jsonData);
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: ((context) => ResultOneLeg(
+              standingTimer: bloc.standingTimer,
+            ))));
   }
 
   void _startTimer() {
@@ -279,9 +179,11 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
       setState(() {
         if (_isPreparing) {
           if (_preparationSeconds > 0) {
+            flutterTts.speak(_preparationSeconds.toString());
             _preparationSeconds--;
           } else {
             _isPreparing = false;
+            flutterTts.speak("시작합니다.");
           }
         } else {
           if (_remainingSeconds > 0) {
@@ -292,13 +194,13 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
             _remainingSeconds = 60;
             bloc.setTime(_standingSeconds);
             _standingSeconds = 0;
-            Navigator.of(context).push(MaterialPageRoute(
-                builder: ((context) => ResultOneLeg(
-                      standingTimer: bloc.standingTimer,
-                    ))));
           }
         }
       });
+      if (!_isPreparing && _remainingSeconds == 0) {
+        flutterTts.speak('끝났습니다.');
+        sendData();
+      }
     });
   }
 
@@ -317,6 +219,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   @override
   void initState() {
     super.initState();
+    _initTts();
     requestPermissions().then((_) => _initialize());
   }
 
@@ -369,45 +272,38 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           var rightelbow = getPoseLandmark(PoseLandmarkType.rightElbow);
           var leftelbow = getPoseLandmark(PoseLandmarkType.leftElbow);
 
-          rightkneeX = rightknee.x;
+          var rightshoulder = getPoseLandmark(PoseLandmarkType.rightShoulder);
+          var leftshoulder = getPoseLandmark(PoseLandmarkType.leftShoulder);
+
           rightkneeY = rightknee.y;
-          rightkneeZ = rightknee.z;
 
-          leftkneeX = leftknee.x;
           leftkneeY = leftknee.y;
-          leftkneeZ = leftknee.z;
 
-          rightankleX = rightankle.x;
           rightankleY = rightankle.y;
-          rightankleZ = rightankle.z;
 
-          leftankleX = leftankle.x;
           leftankleY = leftankle.y;
-          leftankleZ = leftankle.z;
 
-          righthipX = righthip.x;
           righthipY = righthip.y;
-          righthipZ = righthip.z;
 
-          lefthipX = lefthip.x;
           lefthipY = lefthip.y;
-          lefthipZ = lefthip.z;
 
           rightwristX = rightwrist.x;
           rightwristY = rightwrist.y;
-          rightwristZ = rightwrist.z;
 
           leftwristX = leftwrist.x;
           leftwristY = leftwrist.y;
-          leftwristZ = leftwrist.z;
 
           rightelbowX = rightelbow.x;
           rightelbowY = rightelbow.y;
-          rightelbowZ = rightelbow.z;
 
           leftelbowX = leftelbow.x;
           leftelbowY = leftelbow.y;
-          leftelbowZ = leftelbow.z;
+
+          rightshoulderX = rightshoulder.x;
+          rightshoulderY = rightshoulder.y;
+
+          leftshoulderX = leftshoulder.x;
+          leftshoulderY = leftshoulder.y;
 
           if (rightknee != null &&
               rightankle != null &&
@@ -415,11 +311,6 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
               righthip != null &&
               rightwrist != null) {
             smoothingPoint();
-
-            final Offset offKnee = Offset(rightKneeXMean, rightKneeYMean);
-            final Offset offrightAnkle =
-                Offset(rightAnkleXMean, rightAnkleYMean);
-            final Offset offHip = Offset(rightHipXMean, rightHipYMean);
 
             final legLength =
                 utils.measureHipToAnkleLength(leftHipYMean, leftAnkleYMean);
@@ -431,37 +322,32 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
 
             print('oneLegtState: $oneLegState');
 
-            savePointCSV(
-              [rightAnkleXMean, rightAnkleYMean, rightAnkleZMean],
-              [leftAnkleXMean, leftAnkleYMean, leftAnkleZMean],
-              [rightKneeXMean, rightKneeYMean, rightKneeZMean],
-              [leftKneeXMean, leftKneeYMean, leftKneeZMean],
-              [rightHipXMean, rightHipYMean, rightHipZMean],
-              [leftHipXMean, leftHipYMean, leftHipZMean],
-              [rightWristXMean, rightWristYMean, rightWristZMean],
-              [leftWristXMean, leftWristYMean, leftWristZMean],
-              [rightElbowXMean, rightElbowYMean, rightElbowZMean],
-              [leftElbowXMean, leftElbowYMean, leftElbowZMean],
-            );
-            log('legLength: $legLength, ankletoAnkle: $ankletoAnkle');
-            log('lefthip: $leftHipYMean, leftankle: $leftAnkleYMean, rightankle: $rightAnkleYMean, righthip: $rightHipYMean');
-            log(rightankleY.toString());
-            log(leftankleY.toString());
+            collectJSONData(
+                rightAnkleYMean,
+                leftAnkleYMean,
+                rightHipYMean,
+                leftHipYMean,
+                rightKneeYMean,
+                leftKneeYMean,
+                rightShoulderXMean,
+                rightShoulderYMean,
+                leftShoulderXMean,
+                leftShoulderYMean,
+                rightWristXMean,
+                rightWristYMean,
+                leftWristXMean,
+                leftWristYMean,
+                rightElbowXMean,
+                rightElbowYMean,
+                leftElbowXMean,
+                leftElbowYMean);
 
             if (oneLegState == OneLegState.legLifted) {
               bloc.lift();
-              print('oneLegState: $oneLegState');
-              print('blocstate: ${bloc.standing}');
               bloc.setOneLegState(oneLegState);
             } else if (oneLegState == OneLegState.legLowered) {
               bloc.low();
-              print('oneLegState: $oneLegState');
-              print('blocstate: ${bloc.standing}');
               bloc.setOneLegState(oneLegState);
-            }
-
-            if (bloc.state == OneLegState.legLifted) {
-              standingKnee.add(rightKneeYMean);
             }
           }
         }
@@ -488,29 +374,76 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     if (_cameras.isEmpty) return Container();
     if (_controller == null) return Container();
     if (_controller?.value.isInitialized == false) return Container();
-    return Container(
-      color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          Center(
-            child: _changingCameraLens
-                ? Center(
-                    child: const Text('Changing camera lens'),
-                  )
-                : CameraPreview(
-                    _controller!,
-                    child: widget.customPaint,
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _changingCameraLens
+              ? Center(
+                  child: CircularProgressIndicator(),
+                )
+              : Expanded(
+                  child: ClipRect(
+                    child: CameraPreview(_controller!, child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return CustomPaint(
+                          size:
+                              Size(constraints.maxWidth, constraints.maxHeight),
+                        );
+                      },
+                    )),
                   ),
+                ),
+          Container(
+            child: Column(
+              children: [
+                Icon(Icons.heart_broken),
+                Text('화면에 몸 전체가 나오도록 해주세요'),
+                Text('평소 걸음걸이로 걸어주세요'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _remainingTimeWidget(),
+                    _standingWidget(),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _cameraButton(),
+                    _switchLiveCameraToggle(),
+                  ],
+                ),
+                _guideVideoButton(),
+              ],
+            ),
           ),
-          _standingWidget(),
-          _backButton(),
-          _switchLiveCameraToggle(),
-          _detectionViewModeToggle(),
-          _zoomControl(),
-          _exposureControl(),
-          _cameraButton(),
-          _remainingTimeWidget()
+        ],
+      ),
+    );
+  }
+
+  Widget _guideVideoButton() {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        padding: EdgeInsets.symmetric(horizontal: 7, vertical: 0),
+      ),
+      onPressed: () {},
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '가이드 영상',
+            style: TextStyle(fontSize: 12, color: Colors.black),
+          ),
+          Icon(
+            Icons.play_circle_filled,
+            color: Colors.grey,
+            size: 15,
+          ),
         ],
       ),
     );
@@ -604,44 +537,6 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     );
   }
 
-  Widget _backButton() => Positioned(
-        top: 40,
-        left: 8,
-        child: SizedBox(
-          height: 50.0,
-          width: 50.0,
-          child: FloatingActionButton(
-            heroTag: Object(),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            backgroundColor: Colors.black54,
-            child: Icon(
-              Icons.arrow_back_ios_outlined,
-              size: 20,
-            ),
-          ),
-        ),
-      );
-
-  Widget _detectionViewModeToggle() => Positioned(
-        bottom: 8,
-        left: 8,
-        child: SizedBox(
-          height: 50.0,
-          width: 50.0,
-          child: FloatingActionButton(
-            heroTag: Object(),
-            onPressed: widget.onDetectorViewModeChanged,
-            backgroundColor: Colors.black54,
-            child: Icon(
-              Icons.photo_library_outlined,
-              size: 25,
-            ),
-          ),
-        ),
-      );
-
   Widget _switchLiveCameraToggle() => Positioned(
         bottom: 8,
         right: 8,
@@ -659,104 +554,6 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
               size: 25,
             ),
           ),
-        ),
-      );
-
-  Widget _zoomControl() => Positioned(
-        bottom: 16,
-        left: 0,
-        right: 0,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: SizedBox(
-            width: 250,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Slider(
-                    value: _currentZoomLevel,
-                    min: _minAvailableZoom,
-                    max: _maxAvailableZoom,
-                    activeColor: Colors.white,
-                    inactiveColor: Colors.white30,
-                    onChanged: (value) async {
-                      setState(() {
-                        _currentZoomLevel = value;
-                      });
-                      await _controller?.setZoomLevel(value);
-                    },
-                  ),
-                ),
-                Container(
-                  width: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Center(
-                      child: Text(
-                        '${_currentZoomLevel.toStringAsFixed(1)}x',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-
-  Widget _exposureControl() => Positioned(
-        top: 40,
-        right: 8,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: 250,
-          ),
-          child: Column(children: [
-            Container(
-              width: 55,
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Center(
-                  child: Text(
-                    '${_currentExposureOffset.toStringAsFixed(1)}x',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: RotatedBox(
-                quarterTurns: 3,
-                child: SizedBox(
-                  height: 30,
-                  child: Slider(
-                    value: _currentExposureOffset,
-                    min: _minAvailableExposureOffset,
-                    max: _maxAvailableExposureOffset,
-                    activeColor: Colors.white,
-                    inactiveColor: Colors.white30,
-                    onChanged: (value) async {
-                      setState(() {
-                        _currentExposureOffset = value;
-                      });
-                      await _controller?.setExposureOffset(value);
-                    },
-                  ),
-                ),
-              ),
-            )
-          ]),
         ),
       );
 
@@ -889,36 +686,24 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
 
   int smoothingFrame = 3; // 평균을 계산하기 위해 사용할 프레임 수
 
-  var rightKneeX = ListQueue<double>();
   var rightKneeY = ListQueue<double>();
-  var rightKneeZ = ListQueue<double>();
-  var leftKneeX = ListQueue<double>();
   var leftKneeY = ListQueue<double>();
-  var leftKneeZ = ListQueue<double>();
-  var rightAnkleX = ListQueue<double>();
   var rightAnkleY = ListQueue<double>();
-  var rightAnkleZ = ListQueue<double>();
-  var leftAnkleX = ListQueue<double>();
   var leftAnkleY = ListQueue<double>();
-  var leftAnkleZ = ListQueue<double>();
-  var rightHipX = ListQueue<double>();
   var rightHipY = ListQueue<double>();
-  var rightHipZ = ListQueue<double>();
-  var leftHipX = ListQueue<double>();
   var leftHipY = ListQueue<double>();
-  var leftHipZ = ListQueue<double>();
   var rightWristX = ListQueue<double>();
   var rightWristY = ListQueue<double>();
-  var rightWristZ = ListQueue<double>();
   var leftWristX = ListQueue<double>();
   var leftWristY = ListQueue<double>();
-  var leftWristZ = ListQueue<double>();
   var rightElbowX = ListQueue<double>();
   var rightElbowY = ListQueue<double>();
-  var rightElbowZ = ListQueue<double>();
   var leftElbowX = ListQueue<double>();
   var leftElbowY = ListQueue<double>();
-  var leftElbowZ = ListQueue<double>();
+  var rightShoulderX = ListQueue<double>();
+  var rightShoulderY = ListQueue<double>();
+  var leftShoulderX = ListQueue<double>();
+  var leftShoulderY = ListQueue<double>();
 
   double getMean(ListQueue<double> queue) {
     if (queue.length < smoothingFrame) {
@@ -948,84 +733,64 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   }
 
   void smoothingPoint() {
-    rightKneeXMean = getMean(rightKneeX);
     rightKneeYMean = getMean(rightKneeY);
-    rightKneeZMean = getMean(rightKneeZ);
 
-    leftKneeXMean = getMean(leftKneeX);
     leftKneeYMean = getMean(leftKneeY);
-    leftKneeZMean = getMean(leftKneeZ);
 
-    rightAnkleXMean = getMean(rightAnkleX);
     rightAnkleYMean = getMean(rightAnkleY);
-    rightAnkleZMean = getMean(rightAnkleZ);
 
-    leftAnkleXMean = getMean(leftAnkleX);
     leftAnkleYMean = getMean(leftAnkleY);
-    leftAnkleZMean = getMean(leftAnkleZ);
 
-    rightHipXMean = getMean(rightHipX);
     rightHipYMean = getMean(rightHipY);
-    rightHipZMean = getMean(rightHipZ);
 
-    leftHipXMean = getMean(leftHipX);
     leftHipYMean = getMean(leftHipY);
-    leftHipZMean = getMean(leftHipZ);
 
     rightWristXMean = getMean(rightWristX);
     rightWristYMean = getMean(rightWristY);
-    rightWristZMean = getMean(rightWristZ);
 
     leftWristXMean = getMean(leftWristX);
     leftWristYMean = getMean(leftWristY);
-    leftWristZMean = getMean(leftWristZ);
 
     rightElbowXMean = getMean(rightElbowX);
     rightElbowYMean = getMean(rightElbowY);
-    rightElbowZMean = getMean(rightElbowZ);
 
     leftElbowXMean = getMean(leftElbowX);
     leftElbowYMean = getMean(leftElbowY);
-    leftElbowZMean = getMean(leftElbowZ);
 
-    checkOutlier(rightkneeX, rightKneeX, rightKneeXMean);
+    rightShoulderXMean = getMean(rightShoulderX);
+    rightShoulderYMean = getMean(rightShoulderY);
+
+    leftShoulderXMean = getMean(leftShoulderX);
+    leftShoulderYMean = getMean(leftShoulderY);
+
     checkOutlier(rightkneeY, rightKneeY, rightKneeYMean);
-    checkOutlier(rightkneeZ, rightKneeZ, rightKneeZMean);
 
-    checkOutlier(leftkneeX, leftKneeX, leftKneeXMean);
     checkOutlier(leftkneeY, leftKneeY, leftKneeYMean);
-    checkOutlier(leftkneeZ, leftKneeZ, leftKneeZMean);
 
-    checkOutlier(rightankleX, rightAnkleX, rightAnkleXMean);
     checkOutlier(rightankleY, rightAnkleY, rightAnkleYMean);
-    checkOutlier(rightankleZ, rightAnkleZ, rightAnkleZMean);
 
-    checkOutlier(leftankleX, leftAnkleX, leftAnkleXMean);
     checkOutlier(leftankleY, leftAnkleY, leftAnkleYMean);
-    checkOutlier(leftankleZ, leftAnkleZ, leftAnkleZMean);
 
-    checkOutlier(righthipX, rightHipX, rightHipXMean);
     checkOutlier(righthipY, rightHipY, rightHipYMean);
-    checkOutlier(righthipZ, rightHipZ, rightHipZMean);
 
-    checkOutlier(lefthipX, leftHipX, leftHipXMean);
     checkOutlier(lefthipY, leftHipY, leftHipYMean);
-    checkOutlier(lefthipZ, leftHipZ, leftHipZMean);
 
     checkOutlier(rightwristX, rightWristX, rightWristXMean);
     checkOutlier(rightwristY, rightWristY, rightWristYMean);
-    checkOutlier(rightwristZ, rightWristZ, rightWristZMean);
 
     checkOutlier(leftwristX, leftWristX, leftWristXMean);
     checkOutlier(leftwristY, leftWristY, leftWristYMean);
-    checkOutlier(leftwristZ, leftWristZ, leftWristZMean);
 
     checkOutlier(rightelbowX, rightElbowX, rightElbowXMean);
     checkOutlier(rightelbowY, rightElbowY, rightElbowYMean);
-    checkOutlier(rightelbowZ, rightElbowZ, rightElbowZMean);
 
     checkOutlier(leftelbowX, leftElbowX, leftElbowXMean);
     checkOutlier(leftelbowY, leftElbowY, leftElbowYMean);
-    checkOutlier(leftelbowZ, leftElbowZ, leftElbowZMean);
+
+    checkOutlier(rightshoulderX, rightShoulderX, rightshoulderX);
+    checkOutlier(rightshoulderY, rightShoulderY, rightshoulderY);
+
+    checkOutlier(leftshoulderX, leftShoulderX, leftshoulderX);
+    checkOutlier(leftshoulderY, leftShoulderY, leftshoulderY);
   }
 }

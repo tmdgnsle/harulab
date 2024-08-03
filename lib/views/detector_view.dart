@@ -58,31 +58,25 @@ class _DetectorViewState extends State<DetectorView> {
   Widget build(BuildContext context) {
     return _mode == DetectorViewMode.liveFeed
         ? widget.isOneLeg
-            ? BlocProvider(
-                create: (context) => OneLegStanding(),
-                child: OneLegCameraView(
-                  posePainter: widget.posePainter,
-                  customPaint: widget.customPaint,
-                  onImage: widget.onImage,
-                  onCameraFeedReady: widget.onCameraFeedReady,
-                  onDetectorViewModeChanged: _onDetectorViewModeChanged,
-                  initialCameraLensDirection: widget.initialCameraLensDirection,
-                  onCameraLensDirectionChanged:
-                      widget.onCameraLensDirectionChanged,
-                ),
+            ? OneLegCameraView(
+                posePainter: widget.posePainter,
+                customPaint: widget.customPaint,
+                onImage: widget.onImage,
+                onCameraFeedReady: widget.onCameraFeedReady,
+                onDetectorViewModeChanged: _onDetectorViewModeChanged,
+                initialCameraLensDirection: widget.initialCameraLensDirection,
+                onCameraLensDirectionChanged:
+                    widget.onCameraLensDirectionChanged,
               )
-            : BlocProvider(
-                create: (context) => MarchingCounter(),
-                child: MarchingCameraView(
-                  posePainter: widget.posePainter,
-                  customPaint: widget.customPaint,
-                  onImage: widget.onImage,
-                  onCameraFeedReady: widget.onCameraFeedReady,
-                  onDetectorViewModeChanged: _onDetectorViewModeChanged,
-                  initialCameraLensDirection: widget.initialCameraLensDirection,
-                  onCameraLensDirectionChanged:
-                      widget.onCameraLensDirectionChanged,
-                ),
+            : MarchingCameraView(
+                posePainter: widget.posePainter,
+                customPaint: widget.customPaint,
+                onImage: widget.onImage,
+                onCameraFeedReady: widget.onCameraFeedReady,
+                onDetectorViewModeChanged: _onDetectorViewModeChanged,
+                initialCameraLensDirection: widget.initialCameraLensDirection,
+                onCameraLensDirectionChanged:
+                    widget.onCameraLensDirectionChanged,
               )
         : GalleryView(
             title: widget.title,
