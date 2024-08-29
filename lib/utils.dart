@@ -1,14 +1,14 @@
-import 'dart:collection';
 import 'dart:developer';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
-import 'package:harulab/models/march_model.dart';
-import 'package:harulab/models/one_leg_model.dart';
+
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+
+import 'cubit/march_model.dart';
+import 'cubit/one_leg_model.dart';
 
 Future<String> getAssetPath(String asset) async {
   final path = await getLocalPath(asset);

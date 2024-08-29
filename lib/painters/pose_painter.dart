@@ -20,7 +20,7 @@ class PosePainter extends CustomPainter {
   final CameraLensDirection cameraLensDirection;
 
   @override
-  //TODO 이 SIZE 받아서 smoothing에 넣기
+
   void paint(Canvas canvas, Size size) {
     CanvasSize = size;
 

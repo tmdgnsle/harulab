@@ -2,8 +2,9 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_mlkit_commons/google_mlkit_commons.dart';
-import 'package:harulab/models/march_model.dart';
-import 'package:harulab/models/one_leg_model.dart';
+import 'package:harulab/cubit/march_model.dart';
+import 'package:harulab/cubit/one_leg_model.dart';
+
 import 'package:harulab/painters/pose_painter.dart';
 import 'package:harulab/views/one_leg_camera_view.dart';
 
@@ -57,31 +58,25 @@ class _DetectorViewState extends State<DetectorView> {
   Widget build(BuildContext context) {
     return _mode == DetectorViewMode.liveFeed
         ? widget.isOneLeg
-            ? BlocProvider(
-                create: (context) => OneLegStanding(),
-                child: OneLegCameraView(
-                  posePainter: widget.posePainter,
-                  customPaint: widget.customPaint,
-                  onImage: widget.onImage,
-                  onCameraFeedReady: widget.onCameraFeedReady,
-                  onDetectorViewModeChanged: _onDetectorViewModeChanged,
-                  initialCameraLensDirection: widget.initialCameraLensDirection,
-                  onCameraLensDirectionChanged:
-                      widget.onCameraLensDirectionChanged,
-                ),
+            ? OneLegCameraView(
+                posePainter: widget.posePainter,
+                customPaint: widget.customPaint,
+                onImage: widget.onImage,
+                onCameraFeedReady: widget.onCameraFeedReady,
+                onDetectorViewModeChanged: _onDetectorViewModeChanged,
+                initialCameraLensDirection: widget.initialCameraLensDirection,
+                onCameraLensDirectionChanged:
+                    widget.onCameraLensDirectionChanged,
               )
-            : BlocProvider(
-                create: (context) => MarchingCounter(),
-                child: MarchingCameraView(
-                  posePainter: widget.posePainter,
-                  customPaint: widget.customPaint,
-                  onImage: widget.onImage,
-                  onCameraFeedReady: widget.onCameraFeedReady,
-                  onDetectorViewModeChanged: _onDetectorViewModeChanged,
-                  initialCameraLensDirection: widget.initialCameraLensDirection,
-                  onCameraLensDirectionChanged:
-                      widget.onCameraLensDirectionChanged,
-                ),
+            : MarchingCameraView(
+                posePainter: widget.posePainter,
+                customPaint: widget.customPaint,
+                onImage: widget.onImage,
+                onCameraFeedReady: widget.onCameraFeedReady,
+                onDetectorViewModeChanged: _onDetectorViewModeChanged,
+                initialCameraLensDirection: widget.initialCameraLensDirection,
+                onCameraLensDirectionChanged:
+                    widget.onCameraLensDirectionChanged,
               )
         : GalleryView(
             title: widget.title,

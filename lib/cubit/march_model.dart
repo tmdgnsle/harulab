@@ -12,6 +12,7 @@ class MarchingCounter extends Cubit<MarchingState> {
   int counter_4 = 0;
   int counter_5 = 0;
   int counter_6 = 0;
+  double standard_deviation = 0;
 
   void setMarchingState(MarchingState current) {
     if (state != current) {
@@ -64,6 +65,24 @@ class MarchingCounter extends Cubit<MarchingState> {
     counter_4 = 0;
     counter_5 = 0;
     counter_6 = 0;
+    emit(state);
+  }
+
+  void deviation() {
+    final double mean = counter / 6;
+    List<int> counters = [
+      counter_1,
+      counter_2,
+      counter_3,
+      counter_4,
+      counter_5,
+      counter_6
+    ];
+    double deviation_sum = 0;
+    for (counter in counters) {
+      deviation_sum += (mean - counter) * (mean - counter);
+    }
+    standard_deviation = deviation_sum / 6;
     emit(state);
   }
 }
