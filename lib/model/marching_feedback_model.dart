@@ -1,47 +1,54 @@
 import 'package:equatable/equatable.dart';
 
 class MarchingFeedbackModel extends Equatable {
-  final double swing_height;
-  final double deviation;
+  final double right_angles;
+  final double left_angles;
+  final double swing_deviation;
+  final double knee_height_deviation;
   final double knee_height;
-  final double left_swing;
-  final double right_swing;
-  final double mean_amplitude;
+  final double left_swing_strength;
+  final double right_swing_strength;
 
-  MarchingFeedbackModel(
-      {required this.swing_height,
-      required this.deviation,
-      required this.knee_height,
-      required this.left_swing,
-      required this.right_swing,
-      required this.mean_amplitude});
+  MarchingFeedbackModel({
+    required this.right_angles,
+    required this.left_angles,
+    required this.swing_deviation,
+    required this.knee_height_deviation,
+    required this.knee_height,
+    required this.left_swing_strength,
+    required this.right_swing_strength,
+  });
 
   MarchingFeedbackModel.init()
       : this(
-            deviation: 0,
+            right_angles: 0,
+            left_angles: 0,
+            knee_height_deviation: 0,
             knee_height: 0,
-            left_swing: 0,
-            mean_amplitude: 0,
-            right_swing: 0,
-            swing_height: 0);
+            left_swing_strength: 0,
+            right_swing_strength: 0,
+            swing_deviation: 0);
 
   factory MarchingFeedbackModel.fromJson(Map<String, dynamic> json) {
     return MarchingFeedbackModel(
-        swing_height: json['swing_height'],
-        deviation: json['deviation'],
-        knee_height: json['knee_height'],
-        left_swing: json['left_swing'],
-        right_swing: json['right_swing'],
-        mean_amplitude: json['mean_amplitude']);
+      right_angles: json['right_angles'],
+      left_angles: json['left_angles'],
+      swing_deviation: json['swing_deviation'],
+      knee_height_deviation: json['knee_height_deviation'],
+      knee_height: json['knee_height'],
+      left_swing_strength: json['left_swing_strength'],
+      right_swing_strength: json['right_swing_strength'],
+    );
   }
 
   @override
   List<Object?> get props => [
-        swing_height,
-        deviation,
+        right_angles,
+        left_angles,
+        swing_deviation,
+        knee_height_deviation,
         knee_height,
-        left_swing,
-        right_swing,
-        mean_amplitude
+        left_swing_strength,
+        right_swing_strength,
       ];
 }

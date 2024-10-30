@@ -45,7 +45,7 @@ double angle(
 }
 
 MarchingState? isMarching(double angleKnee, MarchingState current) {
-  final thresholdKneeLift = 90.0; // 무릎이 최대로 구부려졌을 때의 각도 임계값
+  final thresholdKneeLift = 80.0; // 무릎이 최대로 구부려졌을 때의 각도 임계값
   final thresholdKneeLower = 130.0; // 무릎이 펴지기 시작하는 각도의 임계값
 
   if (current == MarchingState.neutral && angleKnee < thresholdKneeLift) {

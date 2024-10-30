@@ -11,8 +11,10 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:harulab/cubit/march_model.dart';
 import 'package:harulab/cubit/marching_feedback_cubit.dart';
-
+import 'package:harulab/painters/coordinates_translator.dart';
+import 'package:harulab/painters/horizontal_line_painter.dart';
 import 'package:harulab/painters/pose_painter.dart';
+
 import 'package:harulab/utils.dart' as utils;
 import 'package:harulab/views/result_marching.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -69,9 +71,13 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   double rightAnkleXMean = 0;
   double rightAnkleYMean = 0;
   double rightAnkleZMean = 0;
+  double leftAnkleYMean = 0;
+  double leftAnkleZMean = 0;
   double rightHipXMean = 0;
   double rightHipYMean = 0;
   double rightHipZMean = 0;
+  double leftHipYMean = 0;
+  double leftHipZMean = 0;
   double rightWristYMean = 0;
   double rightWristZMean = 0;
   double leftWristYMean = 0;
@@ -86,9 +92,13 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   var rightankleX;
   var rightankleY;
   var rightankleZ;
+  var leftankleY;
+  var leftankleZ;
   var righthipX;
   var righthipY;
   var righthipZ;
+  var lefthipY;
+  var lefthipZ;
   var rightwristY;
   var rightwristZ;
   var leftwristY;
@@ -99,6 +109,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   Timer? _timer; // 타이머를 제어할 Timer 객체
   int _preparationSeconds = 5; // 5초 준비 시간
   bool _isPreparing = false; // 준비 중인지 여부를 나타내는 플래그
+  bool _isInPosition = false;
 
   List<Map<String, dynamic>> jsonData = [];
 
@@ -114,6 +125,8 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   }
 
   void collectJSONData(
+    double rightKneeAngle,
+    double leftKneeAngle,
     double leftWristY,
     double rightWristY,
     double leftWristZ,
@@ -123,25 +136,44 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   ) {
     Map<String, dynamic> dataPoint = {
       "Timestamp": DateTime.now().toUtc().toIso8601String(),
-      "leftWrist Y": leftWristY,
-      "rightWrist Y": rightWristY,
-      "leftWrist Z": leftWristZ,
-      "rightWrist Z": rightWristZ,
-      "leftKnee Y": leftKneeY,
-      "rightKnee Y": rightKneeY,
+      "rightKneeAngle": rightKneeAngle,
+      "leftKneeAngle": leftKneeAngle,
+      "leftWrist_Y": leftWristY,
+      "rightWrist_Y": rightWristY,
+      "leftWrist_Z": leftWristZ,
+      "rightWrist_Z": rightWristZ,
+      "leftKnee_Y": leftKneeY,
+      "rightKnee_Y": rightKneeY,
     };
     jsonData.add(dataPoint);
   }
 
   void sendData() async {
-    context.read<MarchingCounter>().deviation();
-    final bloc = BlocProvider.of<MarchingCounter>(context);
-    await context.read<MarchingFeedbackCubit>().sendMarching(jsonData);
-    Navigator.of(context).push(MaterialPageRoute(
-        builder: ((context) => ResultMarching(
-              counter: bloc.counter,
-              standad_deviation: bloc.standard_deviation,
-            ))));
+    try {
+      // await _stopLiveFeed();
+
+      context.read<MarchingCounter>().calculateDeviation();
+      final bloc = context.read<MarchingCounter>();
+      final feedbackCubit = context.read<MarchingFeedbackCubit>();
+      await feedbackCubit.sendMarching(jsonData);
+
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => BlocProvider.value(
+          value: feedbackCubit,
+          child: ResultMarching(
+            counter: bloc.totalCounter,
+            standard_deviation: bloc.standard_deviation,
+          ),
+        ),
+      ));
+    } catch (e, stackTrace) {
+      print('Error in sendData: $e');
+      print('Stack trace: $stackTrace');
+      // 사용자에게 에러 메시지 표시
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred: $e')),
+      );
+    }
   }
 
   void _startTimer() {
@@ -221,8 +253,10 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           var leftknee = getPoseLandmark(PoseLandmarkType.leftKnee);
 
           var rightankle = getPoseLandmark(PoseLandmarkType.rightAnkle);
+          var leftankle = getPoseLandmark(PoseLandmarkType.leftAnkle);
 
           var righthip = getPoseLandmark(PoseLandmarkType.rightHip);
+          var lefthip = getPoseLandmark(PoseLandmarkType.leftHip);
 
           var rightwrist = getPoseLandmark(PoseLandmarkType.rightWrist);
           var leftwrist = getPoseLandmark(PoseLandmarkType.leftWrist);
@@ -239,9 +273,15 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           rightankleY = rightankle.y;
           rightankleZ = rightankle.z;
 
+          leftankleY = leftankle.y;
+          leftankleZ = leftankle.z;
+
           righthipX = righthip.x;
           righthipY = righthip.y;
           righthipZ = righthip.z;
+
+          lefthipY = lefthip.y;
+          lefthipZ = lefthip.z;
 
           rightwristY = rightwrist.y;
           rightwristZ = rightwrist.z;
@@ -256,13 +296,22 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
               leftwrist != null) {
             smoothingPoint();
 
-            final Offset offKnee = Offset(rightKneeYMean, rightKneeZMean);
-            final Offset offAnkle = Offset(rightAnkleYMean, rightAnkleZMean);
-            final Offset offHip = Offset(rightHipYMean, rightHipZMean);
+            final Offset rightOffKnee = Offset(rightKneeYMean, rightKneeZMean);
+            final Offset rightOffAnkle =
+                Offset(rightAnkleYMean, rightAnkleZMean);
+            final Offset rightOffHip = Offset(rightHipYMean, rightHipZMean);
 
-            final kneeAngle = utils.angle(offHip, offKnee, offAnkle);
+            final rightKneeAngle =
+                utils.angle(rightOffHip, rightOffKnee, rightOffAnkle);
 
-            final marchingState = utils.isMarching(kneeAngle, bloc.state);
+            final Offset leftOffKnee = Offset(leftKneeYMean, leftKneeZMean);
+            final Offset leftOffAnkle = Offset(leftAnkleYMean, leftAnkleZMean);
+            final Offset leftOffHip = Offset(leftHipYMean, leftHipZMean);
+
+            final leftKneeAngle =
+                utils.angle(leftOffHip, leftOffKnee, leftOffAnkle);
+
+            final marchingState = utils.isMarching(rightKneeAngle, bloc.state);
 
             if (marchingState != null) {
               if (marchingState == MarchingState.legLifted) {
@@ -302,8 +351,15 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
                 } // 상태 초기화
               }
             }
-            collectJSONData(leftWristYMean, rightWristYMean, leftWristZMean,
-                rightWristZMean, leftKneeYMean, rightKneeYMean);
+            collectJSONData(
+                rightKneeAngle,
+                leftKneeAngle,
+                leftWristYMean,
+                rightWristYMean,
+                leftWristZMean,
+                rightWristZMean,
+                leftKneeYMean,
+                rightKneeYMean);
           }
         }
       }
@@ -350,18 +406,35 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
               ? Center(
                   child: CircularProgressIndicator(),
                 )
-              : Expanded(
-                  child: ClipRect(
-                    child: CameraPreview(_controller!, child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return CustomPaint(
-                          size:
-                              Size(constraints.maxWidth, constraints.maxHeight),
-                        );
-                      },
-                    )),
-                  ),
-                ),
+              : _controller == null
+                  ? Center(
+                      child: CircularProgressIndicator(),
+                    )
+                  : Expanded(
+                      child: ClipRect(
+                        child: CameraPreview(_controller!, child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Positioned.fill(
+                                  child: CustomPaint(
+                                    painter: HorizontalLinesPainter(
+                                        isInPosition: _isInPosition),
+                                    size: Size(constraints.maxWidth,
+                                        constraints.maxHeight),
+                                  ),
+                                ),
+                                if (widget.customPaint != null)
+                                  Positioned.fill(
+                                    child: widget.customPaint!,
+                                  ),
+                              ],
+                            );
+                          },
+                        )),
+                      ),
+                    ),
           Container(
             child: Column(
               children: [
@@ -389,6 +462,57 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
         ],
       ),
     );
+  }
+
+  void _processCameraImage(CameraImage image) {
+    final inputImage = _inputImageFromCameraImage(image);
+    if (inputImage == null) return;
+    widget.onImage(inputImage);
+
+    if (widget.posePainter != null && widget.posePainter!.poses.isNotEmpty) {
+      final pose = widget.posePainter!.poses.first;
+      final nose = pose.landmarks[PoseLandmarkType.nose];
+      final leftAnkle = pose.landmarks[PoseLandmarkType.leftAnkle];
+      final rightAnkle = pose.landmarks[PoseLandmarkType.rightAnkle];
+
+      if (nose != null && leftAnkle != null && rightAnkle != null) {
+        final normalizedNoseY = translateY(
+            nose.y,
+            CanvasSize!,
+            inputImage.metadata!.size,
+            inputImage.metadata!.rotation,
+            _controller!.description.lensDirection);
+
+        final normalizedLeftAnkleY = translateY(
+            leftAnkle.y,
+            CanvasSize!,
+            inputImage.metadata!.size,
+            inputImage.metadata!.rotation,
+            _controller!.description.lensDirection);
+        final normalizedRightAnkleY = translateY(
+            rightAnkle.y,
+            CanvasSize!,
+            inputImage.metadata!.size,
+            inputImage.metadata!.rotation,
+            _controller!.description.lensDirection);
+
+        // 위치 확인 로직 개선
+        bool isNoseInPosition =
+            normalizedNoseY > topLineY! && normalizedNoseY < bottomLineY!;
+        bool areAnklesInPosition = normalizedLeftAnkleY > topLineY! &&
+            normalizedLeftAnkleY < bottomLineY! &&
+            normalizedRightAnkleY > topLineY! &&
+            normalizedRightAnkleY < bottomLineY!;
+
+        bool newIsInPosition = isNoseInPosition && areAnklesInPosition;
+
+        if (newIsInPosition != _isInPosition) {
+          setState(() {
+            _isInPosition = newIsInPosition;
+          });
+        }
+      }
+    }
   }
 
   Widget _guideVideoButton() {
@@ -426,6 +550,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
                 _timer?.cancel();
                 _remainingSeconds = 60;
               } else {
+                bloc.reset();
                 _startTimer();
               }
               setState(() {
@@ -466,7 +591,7 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
           border: Border.all(color: Colors.white.withOpacity(0.4), width: 4.0),
           borderRadius: const BorderRadius.all(Radius.circular(12))),
       child: Text(
-        '${bloc.counter}',
+        '${bloc.totalCounter}',
         textAlign: TextAlign.center,
         style: const TextStyle(
             color: Colors.white, fontSize: 30.0, fontWeight: FontWeight.bold),
@@ -538,12 +663,6 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     await _stopLiveFeed();
     await _startLiveFeed();
     setState(() => _changingCameraLens = false);
-  }
-
-  void _processCameraImage(CameraImage image) {
-    final inputImage = _inputImageFromCameraImage(image);
-    if (inputImage == null) return;
-    widget.onImage(inputImage);
   }
 
   final _orientations = {
@@ -622,9 +741,13 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
   var rightAnkleX = ListQueue<double>();
   var rightAnkleY = ListQueue<double>();
   var rightAnkleZ = ListQueue<double>();
+  var leftAnkleY = ListQueue<double>();
+  var leftAnkleZ = ListQueue<double>();
   var rightHipX = ListQueue<double>();
   var rightHipY = ListQueue<double>();
   var rightHipZ = ListQueue<double>();
+  var leftHipY = ListQueue<double>();
+  var leftHipZ = ListQueue<double>();
   var rightWristY = ListQueue<double>();
   var rightWristZ = ListQueue<double>();
   var leftWristY = ListQueue<double>();
@@ -669,9 +792,15 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     rightAnkleYMean = getMean(rightAnkleY);
     rightAnkleZMean = getMean(rightAnkleZ);
 
+    leftAnkleYMean = getMean(leftAnkleY);
+    leftAnkleZMean = getMean(leftAnkleZ);
+
     rightHipXMean = getMean(rightHipX);
     rightHipYMean = getMean(rightHipY);
     rightHipZMean = getMean(rightHipZ);
+
+    leftHipYMean = getMean(leftHipY);
+    leftHipZMean = getMean(leftHipZ);
 
     rightWristYMean = getMean(rightWristY);
     rightWristZMean = getMean(rightWristZ);
@@ -691,9 +820,15 @@ class _MarchingCameraViewState extends State<MarchingCameraView> {
     checkOutlier(rightankleY, rightAnkleY, rightAnkleYMean);
     checkOutlier(rightankleZ, rightAnkleZ, rightAnkleZMean);
 
+    checkOutlier(leftankleY, leftAnkleY, leftAnkleYMean);
+    checkOutlier(leftankleZ, leftAnkleZ, leftAnkleZMean);
+
     checkOutlier(righthipX, rightHipX, rightHipXMean);
     checkOutlier(righthipY, rightHipY, rightHipYMean);
     checkOutlier(righthipZ, rightHipZ, rightHipZMean);
+
+    checkOutlier(lefthipY, leftHipY, leftHipYMean);
+    checkOutlier(lefthipZ, leftHipZ, leftHipZMean);
 
     checkOutlier(rightwristY, rightWristY, rightWristYMean);
     checkOutlier(rightwristZ, rightWristZ, rightWristZMean);

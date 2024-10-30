@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import 'package:harulab/views/pose_detection_view.dart';
+import 'package:lottie/lottie.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -57,7 +57,6 @@ class SplashScreen extends StatelessWidget {
                 style: TextStyle(color: Colors.white),
               ),
             ),
-
             ElevatedButton(
               style: raisedButtonStyle,
               onPressed: () {

@@ -20,7 +20,6 @@ class PosePainter extends CustomPainter {
   final CameraLensDirection cameraLensDirection;
 
   @override
-
   void paint(Canvas canvas, Size size) {
     CanvasSize = size;
 

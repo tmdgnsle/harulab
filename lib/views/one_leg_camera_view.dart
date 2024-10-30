@@ -10,8 +10,10 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:harulab/cubit/one_leg_feedback_cubit.dart';
 import 'package:harulab/cubit/one_leg_model.dart';
-
+import 'package:harulab/painters/coordinates_translator.dart';
+import 'package:harulab/painters/horizontal_line_painter.dart';
 import 'package:harulab/painters/pose_painter.dart';
+
 import 'package:harulab/utils.dart' as utils;
 import 'package:harulab/views/result_one_leg.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -103,6 +105,7 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
 
   int _preparationSeconds = 5; // 5초 준비 시간
   bool _isPreparing = false; // 준비 중인지 여부를 나타내는 플래그
+  bool _isInPosition = false;
 
   List<Map<String, dynamic>> jsonData = [];
 
@@ -122,8 +125,6 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     double leftAnkleY,
     double rightHipY,
     double leftHipY,
-    double rightKneeY,
-    double leftKneeY,
     double rightShoulderX,
     double rightShoulderY,
     double leftShoulderX,
@@ -139,35 +140,48 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   ) {
     Map<String, dynamic> dataPoint = {
       "Timestamp": DateTime.now().toUtc().toIso8601String(),
-      "rightAnkle Y": rightAnkleY,
-      "leftAnkle Y": leftAnkleY,
-      "rightHip Y": rightHipY,
-      "leftHip Y": leftHipY,
-      "rightKnee Y": rightKneeY,
-      "leftKnee Y": leftKneeY,
-      "rightShoulder X": rightShoulderX,
-      "rightShoulder Y": rightShoulderY,
-      "leftShoulder X": leftShoulderX,
-      "leftShoulder Y": leftShoulderY,
-      "rightWrist X": rightWristX,
-      "rightWrist Y": rightWristY,
-      "leftWrist X": leftWristX,
-      "leftWrist Y": leftWristY,
-      "rightElbow X": rightElbowX,
-      "rightElbow Y": rightElbowY,
-      "leftElbow X": leftElbowX,
-      "leftElbow Y": leftElbowY,
+      "rightAnkle_Y": rightAnkleY,
+      "leftAnkle_Y": leftAnkleY,
+      "rightHip_Y": rightHipY,
+      "leftHip_Y": leftHipY,
+      "rightShoulder_X": rightShoulderX,
+      "rightShoulder_Y": rightShoulderY,
+      "leftShoulder_X": leftShoulderX,
+      "leftShoulder_Y": leftShoulderY,
+      "rightWrist_X": rightWristX,
+      "rightWrist_Y": rightWristY,
+      "leftWrist_X": leftWristX,
+      "leftWrist_Y": leftWristY,
+      "rightElbow_X": rightElbowX,
+      "rightElbow_Y": rightElbowY,
+      "leftElbow_X": leftElbowX,
+      "leftElbow_Y": leftElbowY,
     };
     jsonData.add(dataPoint);
   }
 
   void sendData() async {
-    final bloc = BlocProvider.of<OneLegStanding>(context);
-    await context.read<OneLegFeedbackCubit>().sendMarching(jsonData);
-    Navigator.of(context).push(MaterialPageRoute(
-        builder: ((context) => ResultOneLeg(
-              standingTimer: bloc.standingTimer,
-            ))));
+    try {
+      // await _stopLiveFeed();
+      final bloc = BlocProvider.of<OneLegStanding>(context);
+      final feedbackCubit = context.read<OneLegFeedbackCubit>();
+      await feedbackCubit.sendMarching(jsonData);
+
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: ((context) => BlocProvider.value(
+                value: feedbackCubit,
+                child: ResultOneLeg(
+                  standingTimer: bloc.standingTimer,
+                ),
+              ))));
+    } catch (e, stackTrace) {
+      print('Error in sendData: $e');
+      print('Stack trace: $stackTrace');
+      // 사용자에게 에러 메시지 표시
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred: $e')),
+      );
+    }
   }
 
   void _startTimer() {
@@ -190,9 +204,11 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
             _remainingSeconds--;
           } else {
             _timer!.cancel(); // 타이머 취소
+            _timer2?.cancel();
             _cameraReady = false; // _cameraReady를 false로 설정
             _remainingSeconds = 60;
             bloc.setTime(_standingSeconds);
+            print("서있는 시간: ${bloc.standingTimer}");
             _standingSeconds = 0;
           }
         }
@@ -263,9 +279,6 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           var rightankle = getPoseLandmark(PoseLandmarkType.rightAnkle);
           var leftankle = getPoseLandmark(PoseLandmarkType.leftAnkle);
 
-          var rightshoulder = getPoseLandmark(PoseLandmarkType.rightShoulder);
-          var leftshoulder = getPoseLandmark(PoseLandmarkType.leftShoulder);
-
           var righthip = getPoseLandmark(PoseLandmarkType.rightHip);
           var lefthip = getPoseLandmark(PoseLandmarkType.leftHip);
 
@@ -275,6 +288,8 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
           var rightelbow = getPoseLandmark(PoseLandmarkType.rightElbow);
           var leftelbow = getPoseLandmark(PoseLandmarkType.leftElbow);
 
+          var rightshoulder = getPoseLandmark(PoseLandmarkType.rightShoulder);
+          var leftshoulder = getPoseLandmark(PoseLandmarkType.leftShoulder);
 
           rightkneeY = rightknee.y;
 
@@ -328,8 +343,6 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
                 leftAnkleYMean,
                 rightHipYMean,
                 leftHipYMean,
-                rightKneeYMean,
-                leftKneeYMean,
                 rightShoulderXMean,
                 rightShoulderYMean,
                 leftShoulderXMean,
@@ -367,6 +380,9 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text('한발서기'),
+      ),
       body: _liveFeedBody(),
     );
   }
@@ -389,9 +405,22 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
                   child: ClipRect(
                     child: CameraPreview(_controller!, child: LayoutBuilder(
                       builder: (context, constraints) {
-                        return CustomPaint(
-                          size:
-                              Size(constraints.maxWidth, constraints.maxHeight),
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: HorizontalLinesPainter(
+                                    isInPosition: _isInPosition),
+                                size: Size(constraints.maxWidth,
+                                    constraints.maxHeight),
+                              ),
+                            ),
+                            if (widget.customPaint != null)
+                              Positioned.fill(
+                                child: widget.customPaint!,
+                              ),
+                          ],
                         );
                       },
                     )),
@@ -451,110 +480,89 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
   }
 
   Widget _cameraButton() {
-    return Positioned(
-      left: 0,
-      right: 0,
-      top: 100,
-      child: FloatingActionButton(
-        onPressed: _isPreparing
-            ? null
-            : () async {
-                final bloc = BlocProvider.of<OneLegStanding>(context);
-                if (_cameraReady == true) {
-                  bloc.low();
-                  _timer!.cancel();
-                  _timer2?.cancel();
-                  _remainingSeconds = 60;
-                  bloc.setTime(_standingSeconds);
-                } else {
-                  _startTimer();
-                  _standingTimer();
-                }
-                setState(() {
-                  _cameraReady = !_cameraReady;
-                });
-              },
-        child: Text(_cameraReady ? '촬영 종료' : '촬영 시작'),
-      ),
+    return ElevatedButton(
+      onPressed: _isPreparing
+          ? null
+          : () async {
+              final bloc = BlocProvider.of<OneLegStanding>(context);
+              if (_cameraReady == true) {
+                bloc.low();
+                _timer!.cancel();
+                _timer2?.cancel();
+                _remainingSeconds = 60;
+                bloc.setTime(_standingSeconds);
+              } else {
+                _startTimer();
+                _standingTimer();
+              }
+              setState(() {
+                _cameraReady = !_cameraReady;
+              });
+            },
+      child: Text(_cameraReady ? '촬영 종료' : '촬영 시작'),
     );
   }
 
   Widget _remainingTimeWidget() {
-    return Positioned(
-      top: 20,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: Text(
-          _isPreparing
-              ? '준비시간: $_preparationSeconds'
-              : '남은시간: ${Duration(seconds: _remainingSeconds).toString().split('.').first.padLeft(8, '0')}',
+    return Column(
+      children: [
+        Text(
+          _isPreparing ? '준비시간' : '측정중',
           style: const TextStyle(
-            color: Colors.white,
             fontSize: 20,
+            fontWeight: FontWeight.normal,
+          ),
+        ),
+        Text(
+          _isPreparing ? '$_preparationSeconds초' : '${60 - _remainingSeconds}초',
+          style: const TextStyle(
+            fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _standingWidget() {
     final bloc = BlocProvider.of<OneLegStanding>(context);
-    return Positioned(
-      left: 0,
-      right: 0,
-      top: 50,
-      child: Container(
-        width: 70,
-        child: Column(
-          children: [
-            const Text(
-              'Standing',
-              style: TextStyle(
+    return Container(
+      width: 70,
+      child: Column(
+        children: [
+          const Text(
+            'Standing',
+            style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          Container(
+            width: 100,
+            decoration: BoxDecoration(
+                color: const Color.fromARGB(137, 20, 15, 15),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.4), width: 4.0),
+                borderRadius: const BorderRadius.all(Radius.circular(12))),
+            child: Text(
+              '${bloc.standing}: ${_standingSeconds}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
                   color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15),
+                  fontSize: 20.0,
+                  fontWeight: FontWeight.bold),
             ),
-            Container(
-              width: 100,
-              decoration: BoxDecoration(
-                  color: const Color.fromARGB(137, 20, 15, 15),
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.4), width: 4.0),
-                  borderRadius: const BorderRadius.all(Radius.circular(12))),
-              child: Text(
-                '${bloc.standing}: ${_standingSeconds}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20.0,
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _switchLiveCameraToggle() => Positioned(
-        bottom: 8,
-        right: 8,
-        child: SizedBox(
-          height: 50.0,
-          width: 50.0,
-          child: FloatingActionButton(
-            heroTag: Object(),
-            onPressed: _switchLiveCamera,
-            backgroundColor: Colors.black54,
-            child: Icon(
-              Platform.isIOS
-                  ? Icons.flip_camera_ios_outlined
-                  : Icons.flip_camera_android_outlined,
-              size: 25,
-            ),
-          ),
+  Widget _switchLiveCameraToggle() => ElevatedButton(
+        onPressed: _switchLiveCamera,
+        child: Icon(
+          Platform.isIOS
+              ? Icons.flip_camera_ios_outlined
+              : Icons.flip_camera_android_outlined,
+          size: 25,
         ),
       );
 
@@ -618,6 +626,51 @@ class _OneLegCameraViewState extends State<OneLegCameraView> {
     final inputImage = _inputImageFromCameraImage(image);
     if (inputImage == null) return;
     widget.onImage(inputImage);
+
+    if (widget.posePainter != null && widget.posePainter!.poses.isNotEmpty) {
+      final pose = widget.posePainter!.poses.first;
+      final nose = pose.landmarks[PoseLandmarkType.nose];
+      final leftAnkle = pose.landmarks[PoseLandmarkType.leftAnkle];
+      final rightAnkle = pose.landmarks[PoseLandmarkType.rightAnkle];
+
+      if (nose != null && leftAnkle != null && rightAnkle != null) {
+        final normalizedNoseY = translateY(
+            nose.y,
+            CanvasSize!,
+            inputImage.metadata!.size,
+            inputImage.metadata!.rotation,
+            _controller!.description.lensDirection);
+
+        final normalizedLeftAnkleY = translateY(
+            leftAnkle.y,
+            CanvasSize!,
+            inputImage.metadata!.size,
+            inputImage.metadata!.rotation,
+            _controller!.description.lensDirection);
+        final normalizedRightAnkleY = translateY(
+            rightAnkle.y,
+            CanvasSize!,
+            inputImage.metadata!.size,
+            inputImage.metadata!.rotation,
+            _controller!.description.lensDirection);
+
+        // 위치 확인 로직 개선
+        bool isNoseInPosition =
+            normalizedNoseY > topLineY! && normalizedNoseY < bottomLineY!;
+        bool areAnklesInPosition = normalizedLeftAnkleY > topLineY! &&
+            normalizedLeftAnkleY < bottomLineY! &&
+            normalizedRightAnkleY > topLineY! &&
+            normalizedRightAnkleY < bottomLineY!;
+
+        bool newIsInPosition = isNoseInPosition && areAnklesInPosition;
+
+        if (newIsInPosition != _isInPosition) {
+          setState(() {
+            _isInPosition = newIsInPosition;
+          });
+        }
+      }
+    }
   }
 
   final _orientations = {

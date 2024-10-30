@@ -41,11 +41,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<key>NSDocumentsFolderUsageDescription</key>
+	<key>NSCameraUsageDescription</key>
+    <string>This app requires access to the camera for capturing photos.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
     <string>Need to save files</string>
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
 </dict>
 </plist>

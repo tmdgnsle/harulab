@@ -16,9 +16,9 @@ class OneLegFeedbackModel extends Equatable {
             liftHeight: 0,
             liftHeightConsistency: 0,
             stable: Stable(
-                shoulder: BodyPartData(stdX: [], stdY: []),
-                wrist: BodyPartData(stdX: [], stdY: []),
-                elbow: BodyPartData(stdX: [], stdY: [])));
+                shoulder: BodyPartData(stdX: [0, 0], stdY: [0, 0]),
+                wrist: BodyPartData(stdX: [0, 0], stdY: [0, 0]),
+                elbow: BodyPartData(stdX: [0, 0], stdY: [0, 0])));
 
   factory OneLegFeedbackModel.fromJson(Map<String, dynamic> json) {
     return OneLegFeedbackModel(
